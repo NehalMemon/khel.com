@@ -3,17 +3,19 @@
 -- Blueprint: docs/SCHEMA.md
 -- Engine: PostgreSQL / Supabase
 -- Description: Core database structure including enums, tables, spatial types,
---              foreign key constraints, performance indices, and RLS policies.
+--              foreign key constraints, performance indices, triggers, and RLS policies.
+-- Strict Order:
+--   1. Extensions & Enums
+--   2. Tables & Indexes (Parent tables before child tables)
+--   3. Functions & Triggers
+--   4. RLS Configuration & Policies
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
--- 1. Ensure Required Extensions
+-- 1. Extensions & Global Enums
 -- ------------------------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
 
--- ------------------------------------------------------------------------------
--- 2. Global Enums
--- ------------------------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
 
 -- User roles across the platform
 DO $$ BEGIN
@@ -93,41 +95,11 @@ EXCEPTION
 END $$;
 
 -- ------------------------------------------------------------------------------
--- 3. Helper Functions
+-- 2. Core Tables & Performance Indexes
+-- (Parent tables defined before child tables)
 -- ------------------------------------------------------------------------------
 
--- Helper function to check admin privileges without triggering recursive RLS
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-    SELECT EXISTS (
-        SELECT 1
-        FROM public.profiles
-        WHERE id = auth.uid()
-          AND role IN ('admin', 'super_admin')
-    );
-$$;
-
--- Automatic updated_at timestamp trigger function
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$$;
-
--- ------------------------------------------------------------------------------
--- 4. Core Tables
--- ------------------------------------------------------------------------------
-
--- Table: profiles (Extends Supabase auth.users)
+-- 2.1 Table: profiles (Parent: extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -138,7 +110,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Table: venues
+-- Profiles indexes
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
+
+-- 2.2 Table: venues (Depends on: profiles)
 CREATE TABLE IF NOT EXISTS public.venues (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -154,7 +129,13 @@ CREATE TABLE IF NOT EXISTS public.venues (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Table: courts
+-- Venues indexes
+CREATE INDEX IF NOT EXISTS idx_venues_owner_id ON public.venues(owner_id);
+CREATE INDEX IF NOT EXISTS idx_venues_status ON public.venues(status);
+CREATE INDEX IF NOT EXISTS idx_venues_area_id ON public.venues(area_id);
+CREATE INDEX IF NOT EXISTS idx_venues_coordinates ON public.venues USING GIST(coordinates);
+
+-- 2.3 Table: courts (Depends on: venues)
 CREATE TABLE IF NOT EXISTS public.courts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     venue_id UUID NOT NULL REFERENCES public.venues(id) ON DELETE CASCADE,
@@ -164,7 +145,11 @@ CREATE TABLE IF NOT EXISTS public.courts (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Table: slots (Pre-generated bookable inventory)
+-- Courts indexes
+CREATE INDEX IF NOT EXISTS idx_courts_venue_id ON public.courts(venue_id);
+CREATE INDEX IF NOT EXISTS idx_courts_sport_id ON public.courts(sport_id);
+
+-- 2.4 Table: slots (Depends on: courts, profiles)
 CREATE TABLE IF NOT EXISTS public.slots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     court_id UUID NOT NULL REFERENCES public.courts(id) ON DELETE CASCADE,
@@ -177,7 +162,13 @@ CREATE TABLE IF NOT EXISTS public.slots (
     CONSTRAINT uq_slots_court_date_start_time UNIQUE (court_id, date, start_time)
 );
 
--- Table: bookings (Confirmed reservations and digital wallet tracking)
+-- Slots indexes
+CREATE INDEX IF NOT EXISTS idx_slots_court_id ON public.slots(court_id);
+CREATE INDEX IF NOT EXISTS idx_slots_date ON public.slots(date);
+CREATE INDEX IF NOT EXISTS idx_slots_status ON public.slots(status);
+CREATE INDEX IF NOT EXISTS idx_slots_held_by ON public.slots(held_by);
+
+-- 2.5 Table: bookings (Depends on: profiles, venues, courts)
 CREATE TABLE IF NOT EXISTS public.bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     booking_ref TEXT UNIQUE NOT NULL,
@@ -194,29 +185,6 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ------------------------------------------------------------------------------
--- 5. Performance & Query Optimization Indexes
--- ------------------------------------------------------------------------------
-
--- Profiles indexes
-CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
-
--- Venues indexes
-CREATE INDEX IF NOT EXISTS idx_venues_owner_id ON public.venues(owner_id);
-CREATE INDEX IF NOT EXISTS idx_venues_status ON public.venues(status);
-CREATE INDEX IF NOT EXISTS idx_venues_area_id ON public.venues(area_id);
-CREATE INDEX IF NOT EXISTS idx_venues_coordinates ON public.venues USING GIST(coordinates);
-
--- Courts indexes
-CREATE INDEX IF NOT EXISTS idx_courts_venue_id ON public.courts(venue_id);
-CREATE INDEX IF NOT EXISTS idx_courts_sport_id ON public.courts(sport_id);
-
--- Slots indexes
-CREATE INDEX IF NOT EXISTS idx_slots_court_id ON public.slots(court_id);
-CREATE INDEX IF NOT EXISTS idx_slots_date ON public.slots(date);
-CREATE INDEX IF NOT EXISTS idx_slots_status ON public.slots(status);
-CREATE INDEX IF NOT EXISTS idx_slots_held_by ON public.slots(held_by);
-
 -- Bookings indexes
 CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON public.bookings(customer_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_venue_id ON public.bookings(venue_id);
@@ -225,9 +193,38 @@ CREATE INDEX IF NOT EXISTS idx_bookings_status ON public.bookings(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON public.bookings(payment_status);
 
 -- ------------------------------------------------------------------------------
--- 6. Updated At Triggers
+-- 3. Functions & Triggers
 -- ------------------------------------------------------------------------------
 
+-- Automatic updated_at timestamp trigger function
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$;
+
+-- Helper function to check admin privileges without triggering recursive RLS
+-- Safe to create now because public.profiles is already created
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.profiles
+        WHERE id = (SELECT auth.uid())
+          AND role IN ('admin', 'super_admin')
+    );
+$$;
+
+-- Triggers for updated_at
 DROP TRIGGER IF EXISTS set_profiles_updated_at ON public.profiles;
 CREATE TRIGGER set_profiles_updated_at
     BEFORE UPDATE ON public.profiles
@@ -253,7 +250,7 @@ CREATE TRIGGER set_bookings_updated_at
     EXECUTE FUNCTION public.handle_updated_at();
 
 -- ------------------------------------------------------------------------------
--- 7. Row Level Security (RLS) Configuration
+-- 4. Row Level Security (RLS) Configuration & Policies
 -- ------------------------------------------------------------------------------
 
 -- Enable RLS on every table
@@ -263,11 +260,7 @@ ALTER TABLE public.courts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 
--- ------------------------------------------------------------------------------
--- 8. Row Level Security Policies
--- ------------------------------------------------------------------------------
-
--- 8.1 PROFILES POLICIES
+-- 4.1 PROFILES POLICIES
 -- "Users can read/update their own profile; admins can read all."
 DROP POLICY IF EXISTS "Users can read own profile or admins read all" ON public.profiles;
 CREATE POLICY "Users can read own profile or admins read all"
@@ -275,8 +268,8 @@ ON public.profiles
 FOR SELECT
 TO authenticated
 USING (
-    auth.uid() = id
-    OR public.is_admin()
+    id = (SELECT auth.uid())
+    OR (SELECT public.is_admin())
 );
 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
@@ -284,17 +277,17 @@ CREATE POLICY "Users can update own profile"
 ON public.profiles
 FOR UPDATE
 TO authenticated
-USING (auth.uid() = id)
-WITH CHECK (auth.uid() = id);
+USING (id = (SELECT auth.uid()))
+WITH CHECK (id = (SELECT auth.uid()));
 
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile"
 ON public.profiles
 FOR INSERT
 TO authenticated
-WITH CHECK (auth.uid() = id);
+WITH CHECK (id = (SELECT auth.uid()));
 
--- 8.2 VENUES POLICIES
+-- 4.2 VENUES POLICIES
 -- "Anonymous/Customers can read rows where status = 'published'. Owners/Staff can read/write their own venue."
 DROP POLICY IF EXISTS "Anyone can read published venues or owners read own" ON public.venues;
 CREATE POLICY "Anyone can read published venues or owners read own"
@@ -303,7 +296,7 @@ FOR SELECT
 TO public
 USING (
     status = 'published'
-    OR (auth.uid() IS NOT NULL AND (owner_id = auth.uid() OR public.is_admin()))
+    OR ((SELECT auth.uid()) IS NOT NULL AND (owner_id = (SELECT auth.uid()) OR (SELECT public.is_admin())))
 );
 
 DROP POLICY IF EXISTS "Owners can insert their own venues" ON public.venues;
@@ -312,8 +305,8 @@ ON public.venues
 FOR INSERT
 TO authenticated
 WITH CHECK (
-    owner_id = auth.uid()
-    OR public.is_admin()
+    owner_id = (SELECT auth.uid())
+    OR (SELECT public.is_admin())
 );
 
 DROP POLICY IF EXISTS "Owners can update their own venues" ON public.venues;
@@ -322,12 +315,12 @@ ON public.venues
 FOR UPDATE
 TO authenticated
 USING (
-    owner_id = auth.uid()
-    OR public.is_admin()
+    owner_id = (SELECT auth.uid())
+    OR (SELECT public.is_admin())
 )
 WITH CHECK (
-    owner_id = auth.uid()
-    OR public.is_admin()
+    owner_id = (SELECT auth.uid())
+    OR (SELECT public.is_admin())
 );
 
 DROP POLICY IF EXISTS "Owners can delete their own venues" ON public.venues;
@@ -336,11 +329,11 @@ ON public.venues
 FOR DELETE
 TO authenticated
 USING (
-    owner_id = auth.uid()
-    OR public.is_admin()
+    owner_id = (SELECT auth.uid())
+    OR (SELECT public.is_admin())
 );
 
--- 8.3 COURTS POLICIES
+-- 4.3 COURTS POLICIES
 -- Courts follow parent venue visibility & owner access
 DROP POLICY IF EXISTS "Anyone can view courts for published venues or owners" ON public.courts;
 CREATE POLICY "Anyone can view courts for published venues or owners"
@@ -351,7 +344,7 @@ USING (
     EXISTS (
         SELECT 1 FROM public.venues
         WHERE venues.id = courts.venue_id
-          AND (venues.status = 'published' OR (auth.uid() IS NOT NULL AND (venues.owner_id = auth.uid() OR public.is_admin())))
+          AND (venues.status = 'published' OR ((SELECT auth.uid()) IS NOT NULL AND (venues.owner_id = (SELECT auth.uid()) OR (SELECT public.is_admin()))))
     )
 );
 
@@ -364,7 +357,7 @@ WITH CHECK (
     EXISTS (
         SELECT 1 FROM public.venues
         WHERE venues.id = courts.venue_id
-          AND (venues.owner_id = auth.uid() OR public.is_admin())
+          AND (venues.owner_id = (SELECT auth.uid()) OR (SELECT public.is_admin()))
     )
 );
 
@@ -377,14 +370,14 @@ USING (
     EXISTS (
         SELECT 1 FROM public.venues
         WHERE venues.id = courts.venue_id
-          AND (venues.owner_id = auth.uid() OR public.is_admin())
+          AND (venues.owner_id = (SELECT auth.uid()) OR (SELECT public.is_admin()))
     )
 )
 WITH CHECK (
     EXISTS (
         SELECT 1 FROM public.venues
         WHERE venues.id = courts.venue_id
-          AND (venues.owner_id = auth.uid() OR public.is_admin())
+          AND (venues.owner_id = (SELECT auth.uid()) OR (SELECT public.is_admin()))
     )
 );
 
@@ -397,11 +390,11 @@ USING (
     EXISTS (
         SELECT 1 FROM public.venues
         WHERE venues.id = courts.venue_id
-          AND (venues.owner_id = auth.uid() OR public.is_admin())
+          AND (venues.owner_id = (SELECT auth.uid()) OR (SELECT public.is_admin()))
     )
 );
 
--- 8.4 SLOTS POLICIES
+-- 4.4 SLOTS POLICIES
 -- "Public read for published venues; writes strictly restricted to system jobs and atomic RPC functions."
 DROP POLICY IF EXISTS "Public read for published venue slots" ON public.slots;
 CREATE POLICY "Public read for published venue slots"
@@ -413,13 +406,11 @@ USING (
         SELECT 1 FROM public.courts
         JOIN public.venues ON venues.id = courts.venue_id
         WHERE courts.id = slots.court_id
-          AND (venues.status = 'published' OR (auth.uid() IS NOT NULL AND (venues.owner_id = auth.uid() OR public.is_admin())))
+          AND (venues.status = 'published' OR ((SELECT auth.uid()) IS NOT NULL AND (venues.owner_id = (SELECT auth.uid()) OR (SELECT public.is_admin()))))
     )
 );
--- Note: Direct INSERT, UPDATE, and DELETE policies are intentionally omitted for public/authenticated roles.
--- Writes are strictly restricted to system jobs (service_role) and atomic SECURITY DEFINER RPC functions.
 
--- 8.5 BOOKINGS POLICIES
+-- 4.5 BOOKINGS POLICIES
 -- "Customers can read/insert their own bookings via secure RPCs; Venue owners/staff can read bookings tied to their venue."
 DROP POLICY IF EXISTS "Customers and venue owners can view relevant bookings" ON public.bookings;
 CREATE POLICY "Customers and venue owners can view relevant bookings"
@@ -427,13 +418,13 @@ ON public.bookings
 FOR SELECT
 TO authenticated
 USING (
-    customer_id = auth.uid()
+    customer_id = (SELECT auth.uid())
     OR EXISTS (
         SELECT 1 FROM public.venues
         WHERE venues.id = bookings.venue_id
-          AND venues.owner_id = auth.uid()
+          AND venues.owner_id = (SELECT auth.uid())
     )
-    OR public.is_admin()
+    OR (SELECT public.is_admin())
 );
 
 DROP POLICY IF EXISTS "Customers can insert their own bookings" ON public.bookings;
@@ -442,7 +433,5 @@ ON public.bookings
 FOR INSERT
 TO authenticated
 WITH CHECK (
-    customer_id = auth.uid()
+    customer_id = (SELECT auth.uid())
 );
--- Note: Direct UPDATE and DELETE on bookings are intentionally omitted for clients.
--- Status transitions and settlement updates are executed strictly through atomic RPCs and webhook processors.
