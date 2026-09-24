@@ -297,6 +297,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      hold_slot: {
+        Args: { p_court_id: string; p_date: string; p_start_time: string }
+        Returns: {
+          held_until: string
+          slot_id: string
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {

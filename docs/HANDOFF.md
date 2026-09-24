@@ -106,5 +106,16 @@ To upload an image, the frontend must execute a two-step process:
 - The component should handle file selection, trigger the two-step upload process, and display a loading spinner during the HTTP requests.
 - Once Cloudinary returns a successful response, extract the `secure_url` and store it in your form state to ultimately be saved in our `venues` or `courts` Postgres tables.
 
+---
 
+## [Feature] Atomic Slot Holding (Checkout Flow)
+### Backend Status
+Completed. `hold_slot` RPC deployed with strict concurrency control and automatic stale-hold resolution.
 
+### Database API / Supabase Usage
+To initiate checkout, the frontend must call the RPC:
+`const { data, error } = await supabase.rpc('hold_slot', { p_court_id, p_date, p_start_time })`
+
+### Frontend UI/UX Requirements
+- The UI must immediately capture any RPC errors (e.g., 'Slot is not available') and show a specific UI state informing the customer the slot was just taken by someone else, rather than a generic error.
+- Use the returned `held_until` timestamp to drive a strict 5-minute countdown timer on the checkout screen.
