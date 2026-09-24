@@ -87,3 +87,24 @@ Whenever a backend feature, migration, or API service is completed, it must be d
 - **State Handling & Edge Cases:**
   - **Profile Completion Notice:** If a user signed up via an external provider or email without a phone number (i.e. their profile has `phone LIKE 'pending-%'`), prompt them with a banner/modal to complete their profile with a verified phone number before booking or listing venues.
   - **Duplicate Phone Error:** If a phone number is already registered to another user, display an explicit inline error: *"This phone number is already linked to an account."*
+
+---
+
+## [Feature] Secure Cloudinary Image Uploads
+### Backend Status
+Completed. Supabase Edge Function `sign-cloudinary-upload` is deployed locally. Cloudinary credentials are set in Supabase secrets.
+
+### Database API / Supabase Usage
+To upload an image, the frontend must execute a two-step process:
+1. **Get Signature:** Call the edge function using the Supabase client:
+   `const { data } = await supabase.functions.invoke('sign-cloudinary-upload', { body: { folder: 'venues' } })`
+2. **Direct Upload:** POST the actual image file directly to Cloudinary's REST API (`https://api.cloudinary.com/v1_1/${data.cloud_name}/image/upload`).
+   Attach a `FormData` object containing: `file`, `api_key`, `timestamp`, `signature`, and `folder`.
+
+### Frontend UI/UX Requirements
+- Build a reusable `<ImageUploader />` component in `src/components/ui/`.
+- The component should handle file selection, trigger the two-step upload process, and display a loading spinner during the HTTP requests.
+- Once Cloudinary returns a successful response, extract the `secure_url` and store it in your form state to ultimately be saved in our `venues` or `courts` Postgres tables.
+
+
+
