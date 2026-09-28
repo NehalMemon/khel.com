@@ -10,37 +10,59 @@ What to build for the Next.js frontend: the app split, the roles, the confirmed 
 
 ## 1. Product Snapshot
 
-Khel.com is an indoor sports venue/court booking marketplace for Karachi (futsal, badminton, etc.). Customers discover venues, book a court/time slot, and pay via digital wallet. Venue owners list and run their own venues. MVP commission is 0%, tracked rather than hardcoded.
+Khel.com is an indoor sports venue/court booking marketplace for Karachi (futsal, badminton, etc.). Customers discover venues, book a court/time slot, and pay via digital wallet. Venue owners list and run their own venues. Commission is **not** a frontend constant: it is read from `app_config.commission_rate` at runtime and can be changed from the admin console without a redeploy. The MVP launch value was 0%, tracked rather than hardcoded.
 
-## 2. Two Apps, Not Three Namespaces
+## 2. Three Apps, Not Namespaces
 
-Per the team's working rules, this is built as **two separate Next.js projects**, not one app with `/app` `/partner` `/admin` route groups:
+> **Changed 2026-09-28.** This section originally specified **two** apps, with the partner
+> portal living inside the user app under `/partner/*`. That was built and then re-split
+> into three independent deployments, because the venue-owner portal needs its own
+> deployment cadence, its own `venue_owner`-only route guard, and its own signup surface.
+> `Team_Workflow_Rules.md` §2 was updated to match. Everything else in this document
+> stands.
 
-- **User app** — customer marketplace *and* the venue partner portal, together (both are "regular" platform users authenticating the same way). Suggested routing, now that there's no need for an `/app` prefix to disambiguate from admin:
-  - `/` , `/venues/[slug]`, `/bookings`, `/profile`, `/auth/sign-in`, `/auth/sign-up` — customer side
-  - `/partner/join`, `/partner`, `/partner/courts`, `/partner/schedule`, `/partner/bookings` — partner side (matches the POC's existing partner routes)
-- **Admin app** — a fully separate project, admin/super_admin only, routes at root level since the whole app is already admin-scoped (`/`, `/venues/review`, `/config`, `/bookings`).
+Per the team's working rules, this is built as **three separate Next.js projects**, not one
+app with route groups:
 
-**This split is my reading of "Frontend User and Frontend Admin, both completely separate" — worth a quick confirm before scaffolding, since it's the one structural assumption everything else in this doc builds on.** If "User" was meant to mean customer-only, with partner as a third thing, the screen inventory in §7 still holds, it just moves under a third project.
+- **User app** (`apps/user`, default port 3000) — customer marketplace only. Customer signup
+  is the only public signup form here, and it can only ever create a `customer`
+  (`PublicSignupRole = Extract<UserRole, "customer">`).
+  - `/`, `/venues/[slug]`, `/venues/[slug]/book`, `/bookings`, `/bookings/confirmation/[bookingRef]`, `/profile`, `/auth/sign-in`, `/auth/sign-up`
+- **Venue owner app** (`apps/venue-owner`, default port 3001) — the partner portal, with a
+  `venue_owner`-only route guard. Signup lives at `/join`.
+  - `/`, `/courts`, `/schedule`, `/bookings`, `/profile`, `/join`, `/sign-in`
+- **Admin app** (`apps/admin`, default port 3002) — a fully separate project, `admin` and
+  `super_admin` only, routes at root level since the whole app is already admin-scoped.
+  - `/`, `/venues/review`, `/venues`, `/courts`, `/partners`, `/users`, `/bookings`, `/config`, `/sign-in`
+
+Cross-app navigation is environment-driven, never an in-app route:
+`NEXT_PUBLIC_PARTNER_APP_URL`, `NEXT_PUBLIC_ADMIN_APP_URL` (read by the user app) and
+`NEXT_PUBLIC_USER_APP_URL` (read by the venue-owner app for the read-only venue preview
+link). Each reader validates that the value is an absolute `http(s)` URL before using it as
+an `href`, so a misconfigured variable cannot become a `javascript:` or protocol-relative
+link.
 
 ## 3. Roles → App → Access
 
 | DB role (`profiles.role`) | App | What RLS grants today |
 |---|---|---|
 | `customer` | User | `SELECT` published venues/courts/slots; `SELECT`/`INSERT` own bookings |
-| `venue_owner` | User (`/partner/*`) | Full CRUD on venues/courts/slots they own; `SELECT`/`UPDATE` on bookings tied to their venues |
-| `venue_staff` | User (`/partner/*`) | Enum value exists; **no RLS policy grants it anything yet** beyond the universal own-profile rule. Don't build staff-specific UI until Nehal defines the boundary (`DESIGN_BACKEND.md` Open Items) |
+| `venue_owner` | Venue owner | Full CRUD on venues/courts/slots they own; `SELECT`/`UPDATE` on bookings tied to their venues |
+| `venue_staff` | — | Enum value exists; **no RLS policy grants it anything yet** beyond the universal own-profile rule. Don't build staff-specific UI until Nehal defines the boundary (`DESIGN_BACKEND.md` Open Items) |
 | `admin` | Admin | `is_admin()` → bypasses tenant isolation, full access |
 | `super_admin` | Admin | Same RLS as `admin` today. Reserve the UI distinction for platform-config actions once `app_config` exists |
 
-**Nobody signs up as `admin` or `super_admin` through a public form.** See §5 for why this matters.
+Nobody signs up as `admin` or `super_admin` through a public form, and nobody signs up as
+`venue_owner` through the user app — the user app's `PublicSignupRole` is narrowed to
+`"customer"` at the type level so a future form cannot widen it by accident. See §5 for why
+this matters.
 
 ## 4. Data Model (plain language)
 
 - **`profiles`** — extends `auth.users`. `name`, `phone` (unique, not null), `avatar_url`, `role`. Created automatically on signup — see §5, never write to this table directly from the frontend.
 - **`venues`** — owned by a profile. `slug` (unique), `address`, `coordinates` (PostGIS point, for "near me" search), `amenities` (freeform `jsonb`), `status`: `draft → submitted → under_review → {approved → published | rejected}`, then `published ↔ suspended`/`archived`.
 - **`courts`** — belongs to a venue. `name`, `sport_type` (free text — seed data uses `"Futsal"`, `"Badminton"`), `hourly_rate`, `metadata` (`jsonb`).
-- **`slots`** — bookable inventory per court/date/time. `status`: `available → held (5 min, via hold_slot) → booked`, or `blocked`/`maintenance` set by the owner.
+- **`slots`** — bookable inventory per court/date/time. `status`: `available → held (via `hold_slot`, lifetime from `app_config.hold_expiry_minutes`) → booked`, or `blocked`/`maintenance` set by the owner.
 - **`bookings`** — `status` (`confirmed → completed | cancelled_by_customer | cancelled_by_venue | no_show`) and `payment_status` (`pending → paid | failed | refunded`) are **independent fields** — don't conflate them in the UI. Also carries the payout ledger: `total_charged`, `venue_payout_amount`, `commission_amount_snapshot`.
 
 Prices are in PKR (seed data: futsal 3000–5000/hr, badminton 1200/hr) — format currency accordingly.
@@ -88,46 +110,74 @@ const { data, error } = await supabase.auth.signInWithPassword({ email, password
 ## 6. State Machines (condensed — full detail lives in `DESIGN_BACKEND.md`)
 
 - **Venue:** `draft → submitted → under_review → {approved → published | rejected}`; `published ↔ suspended`/`archived`. What triggers `approved → published` isn't documented yet.
-- **Slot:** `available → held (5 min TTL) → booked`, or `→ blocked`/`maintenance`. Nothing currently reverts an expired hold back to `available` — the UI should treat a `hold_slot` conflict (slot taken) as a normal, expected response, not an edge case.
+- **Slot:** `available → held (via `hold_slot`, lifetime from `app_config.hold_expiry_minutes`) → booked`, or `→ blocked`/`maintenance`. Nothing currently reverts an expired hold back to `available` — the UI treats a `hold_slot` conflict (slot taken) as a normal, expected response, not an edge case.
 - **Booking / payment:** two independent fields, see §4.
 
 ## 7. Screen Inventory
 
-### User app — customer side (build from scratch)
-1. **Discover** — browse/search published venues (area, sport type)
-2. **Venue detail** — info, amenities, rating, courts list
-3. **Slot picker** — date/time grid over `available` slots for a court
-4. **Checkout** — `hold_slot` → 5-min countdown → payment Edge Function → wallet redirect
-5. **Booking confirmation** — post-payment return, shows `booking_ref`
-6. **My Bookings** — status + payment_status badges, cancel action
-7. **Sign up / Sign in** — per §5's contract exactly
-8. **Profile** — edit name/phone/avatar; shows the pending-phone banner when relevant
+> Status annotated 2026-09-28. Every screen below is built. Open items are the backend gaps
+> listed in `DESIGN_BACKEND.md` §5, not missing UI.
 
-### User app — partner side (`/partner/*`)
-| Screen | State in the `web/` POC |
+### User app — customer side
+1. **Discover** — built. Nearby mode via `search_venues_nearby` plus an all-venues mode,
+   search and sport filters, distance badges, and Cloudinary cover images. Sport facets are
+   derived from distinct `courts.sport_type` values because there is no `sports` table
+2. **Venue detail** — built. Info, amenities, photos, rating, courts list
+3. **Slot picker** — built. Date/time grid over `available` slots for a court
+4. **Checkout** — built to the hold. `hold_slot` → server-driven countdown → payment is
+   **blocked**; the UI shows a "Payment connection pending" notice instead of a fake purchase
+5. **Booking confirmation** — built. Reads `booking_ref`; safe to load twice
+6. **My Bookings** — built. Status and payment badges kept separate, cancel action
+7. **Sign up / sign in** — built per §5's contract. Customer role only
+8. **Profile** — built. Name/phone/avatar, pending-phone banner, subscription tier badge
+
+### Venue owner app
+| Screen | Status |
 |---|---|
-| Join / sign in | Built, but rebuild per §5's confirmed contract (name+phone+role in `options.data`), not the POC's email-only version |
-| Partner shell (nav: My Venue / Courts / Schedule / Bookings) | Built with inline hex styles — not a base to extend, see §10 |
-| My Venue | Built (371 lines) — review before porting |
-| Courts | Stub only — build: list/add/edit courts |
-| Schedule | Stub only — build: generate/manage slots, bulk-generate, toggle blocked/maintenance |
-| Bookings | Stub only — build: bookings for owned venues, mark no_show, payout figures |
+| Join / sign in (`/join`, `/sign-in`) | Built per §5's contract, `venue_owner` role only, safe same-origin `next` redirect |
+| Portal shell (nav: Dashboard / Courts / Schedule / Bookings / Profile) | Built |
+| Dashboard | Built. Venue status workflow, per-venue metrics, published-venue preview link |
+| My Venue | Built. Venue CRUD, amenities, PostGIS coordinates, Cloudinary photo upload (max 8, stored in `amenities.images`) |
+| Courts | Built. List/add/edit courts; sport suggestions derived from the owner's own inventory |
+| Schedule | Built. Bulk slot generation, per-slot block/open, held-slot expiry shown. Stale-hold cleanup is still a backend open item |
+| Bookings | Built. Bookings for owned venues, status + payment badges kept separate, payout figures |
+| Profile | Built. Name/phone, role and subscription tier badges |
 
-### Admin app (nothing built yet)
-1. **Sign in only — no public sign-up screen.** Admin accounts aren't self-service; see `DESIGN_BACKEND.md` §5 for the open question on how they're provisioned.
-2. **Venue review queue** — `submitted`/`under_review` venues, approve/reject/publish
-3. **Platform config** — CRUD over `app_config` once it exists (commission %, radius, slot duration, hold expiry)
-4. **Bookings oversight** — platform-wide view
+### Admin app
+1. **Sign in only — no public sign-up screen.** Admin accounts aren't self-service; see
+   `DESIGN_BACKEND.md` §5 for the open question on how they're provisioned
+2. **Venue review queue** — built. `submitted` → `under_review` → `approved`/`rejected`, with
+   listing photos and courts in the review card. The `approved → published` step is
+   deliberately disabled; the allowed transitions are declared once in
+   `apps/admin/src/lib/queries.ts` (`canTransitionVenue`)
+3. **All venues** — built. Every venue with courts, derived sports, rate range, and photo count
+4. **Courts** — built. Platform-wide list with inline name/sport/rate editing
+5. **Venue owners** — built. `venue_owner` accounts matched to their venues via
+   `venues.owner_id`. Staff accounts are excluded because `venue_staff` has no RLS
+6. **Users** — built. Search, role filter, and role/subscription-tier editing. Backed by
+   `ProfilePrivilegedUpdate`; the `subscription_tier` trigger still guards every write and
+   rejects self-promotion
+7. **Platform config** — built. Live read/write of `app_config` (commission, search radius,
+   hold expiry) with client-side range validation; the `admin_update_app_config` policy
+   enforces `is_admin()` server-side
+8. **Bookings oversight** — built. Platform-wide view with search and payment filter
 
 ## 8. What the Frontend Can Call Today
+
+> Refreshed 2026-09-28 against the migrations actually present in `supabase/migrations/`.
+> The previous version of this table predated the `hold_slot` and `app_config` migrations.
 
 | Capability | Status |
 |---|---|
 | `supabase.auth.signUp` / `signInWithPassword` | **Ready** — contract confirmed in §5 |
 | Reads on `venues`/`courts`/`slots`/`bookings` per RLS in §3 | **Ready** |
-| `hold_slot` RPC | **Not implemented yet** — build the checkout UI against the documented shape in `API_CONTRACTS.md`, but don't expect it to work until Nehal ships it |
-| `confirm_booking_with_payment` RPC | **Not implemented yet**, and not client-callable anyway (webhook-only) |
-| Payment initiation | **No Edge Function yet**, gateway not chosen |
+| `hold_slot(p_court_id, p_date, p_start_time)` | **Shipped** — `20260925123004_add_freemium_holds.sql`. Returns `Array<{ slot_id, held_until }>`. The checkout UI drives its countdown from `held_until`; there is no client-side TTL constant |
+| `search_venues_nearby(p_lat, p_lon, p_radius_km)` | **Shipped** — `20260925142542`/`20260925141031`. Powers nearby discovery; radius comes from `app_config`, and a denied geolocation prompt falls back to central Karachi |
+| `app_config` table | **Shipped** — `20260925142542_create_app_config.sql`. All three apps read it at runtime via `src/lib/app-config.ts`; the admin console edits it. Commission, search radius, and hold expiry are no longer hardcoded anywhere |
+| `confirm_booking_with_payment(p_booking_id, p_gateway_ref, p_amount_paid)` | **Shipped but webhook/admin-only** — never client-callable. Requires a booking that already exists |
+| Payment initiation | **No Edge Function yet**, gateway not chosen. The customer app stops after the hold and says so explicitly |
+| Booking creation from a customer request | **No contract yet** — the confirmation RPC expects a pre-existing booking, so there is no safe client path to create one |
+| Stale-hold cleanup | **No scheduled job yet** — expired holds stay `held` until a customer collides with them; the RPC stays authoritative |
 
 ## 9. Build Notes for the Next.js Port
 
@@ -135,7 +185,12 @@ const { data, error } = await supabase.auth.signInWithPassword({ email, password
 - **Supabase client split**: browser client + server client via `@supabase/ssr`, since Next.js needs SSR-safe cookie-based sessions (the POC's single browser-only client won't work here).
 - **Env vars**: `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (replacing the POC's `VITE_` prefix).
 - **Components**: shadcn/ui in both apps (`npx shadcn@latest init`, Tailwind v4, CSS-first config — no `tailwind.config.js`). Install and configure it as part of scaffolding rather than leaving it for later.
-- **Types**: `web/src/types/database.types.ts` already matches the current schema — copy it into each app and regenerate with `supabase gen types typescript` after future migrations, don't hand-edit it.
+- **Types**: each app keeps a hand-maintained mirror at `src/lib/database.types.ts`. It was
+  originally seeded from `web/src/types/database.types.ts`, but that file was stale — it
+  declared a `courts.sport_id` column that no migration ever creates. The `sport_id` entries
+  have been removed, and the three app mirrors are now the maintained source of truth. Run
+  `supabase gen types typescript` after future migrations and reconcile by hand rather than
+  overwriting; never reintroduce `courts.sport_id`.
 - Per the existing `.agents/rules/frontend-rules.md`: no `any` types, shared UI lives in `components/ui/`, no hardcoded business rules (commission/radius/durations come from `app_config` once it exists).
 
 ## 10. Design System Starting Point

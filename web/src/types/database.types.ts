@@ -145,7 +145,6 @@ export type Database = {
           id: string
           metadata: Json
           name: string
-          sport_id: string | null
           sport_type: string | null
           updated_at: string
           venue_id: string
@@ -156,7 +155,6 @@ export type Database = {
           id?: string
           metadata?: Json
           name: string
-          sport_id?: string | null
           sport_type?: string | null
           updated_at?: string
           venue_id: string
@@ -167,7 +165,6 @@ export type Database = {
           id?: string
           metadata?: Json
           name?: string
-          sport_id?: string | null
           sport_type?: string | null
           updated_at?: string
           venue_id?: string

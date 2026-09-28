@@ -15,7 +15,7 @@ import {
   withVenueImages,
   type PartnerVenueValues,
 } from "@/lib/queries"
-import { getErrorMessage, slugify } from "@/lib/utils"
+import { getErrorMessage, KARACHI_FALLBACK, slugify } from "@/lib/utils"
 
 /** Mirrors the Edge Function's accepted folder prefix for venue imagery. */
 const VENUE_IMAGE_FOLDER = "venue-images"
@@ -338,7 +338,7 @@ export function VenueManager({
                   inputMode="decimal"
                   value={form.latitude}
                   onChange={(event) => updateField("latitude", event.target.value)}
-                  placeholder="24.8607"
+                  placeholder={String(KARACHI_FALLBACK.lat)}
                   className="h-11"
                 />
               </div>
@@ -349,7 +349,7 @@ export function VenueManager({
                   inputMode="decimal"
                   value={form.longitude}
                   onChange={(event) => updateField("longitude", event.target.value)}
-                  placeholder="67.0011"
+                  placeholder={String(KARACHI_FALLBACK.lon)}
                   className="h-11"
                 />
               </div>

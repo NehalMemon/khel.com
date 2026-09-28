@@ -13,17 +13,6 @@ import { StatusBadge } from "@/components/app/status-badge"
 import { useAllVenues, usePartners } from "@/hooks/use-data"
 import { formatDateTime, formatPhone, isPendingPhone } from "@/lib/utils"
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
-  submitted: "Submitted",
-  under_review: "Under review",
-  approved: "Approved",
-  published: "Published",
-  rejected: "Rejected",
-  suspended: "Suspended",
-  archived: "Archived",
-}
-
 export function PartnersPage() {
   const partnersQuery = usePartners()
   const venuesQuery = useAllVenues()
@@ -141,16 +130,14 @@ export function PartnersPage() {
                       {venues.length === 0 ? (
                         <span className="text-muted-foreground">No listings yet</span>
                       ) : (
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           {venues.slice(0, 3).map((venue) => (
                             <span
                               key={venue.id}
-                              className="rounded-md border px-2 py-0.5 text-xs"
+                              className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs"
                             >
                               {venue.name}
-                              <span className="ml-1.5 text-muted-foreground">
-                                {STATUS_LABEL[venue.status] ?? venue.status}
-                              </span>
+                              <StatusBadge status={venue.status} />
                             </span>
                           ))}
                           {venues.length > 3 ? (

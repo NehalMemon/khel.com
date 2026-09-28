@@ -32,11 +32,9 @@ import {
   usePartnerVenues,
   useSubmitVenueMutation,
 } from "@/hooks/use-data"
+import { userVenuePreviewUrl } from "@/lib/app-links"
 import type { VenueRow } from "@/lib/database.types"
 import { formatCurrency, getErrorMessage, isPendingPhone } from "@/lib/utils"
-
-/** Base URL of the customer app, used only for the read-only venue preview link. */
-const USER_APP_URL = process.env.NEXT_PUBLIC_USER_APP_URL?.replace(/\/$/, "")
 
 export function PartnerDashboard() {
   const { profile } = useAuth()
@@ -181,50 +179,50 @@ export function PartnerDashboard() {
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 pt-5">
-            {venues.map((venue) => (
-              <div
-                key={venue.id}
-                className="flex flex-col justify-between gap-3 rounded-xl border p-4 sm:flex-row sm:items-center"
-              >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{venue.name}</h3>
-                    <StatusBadge status={venue.status} />
+            {venues.map((venue) => {
+              const previewUrl =
+                venue.status === "published" ? userVenuePreviewUrl(venue.slug) : null
+              return (
+                <div
+                  key={venue.id}
+                  className="flex flex-col justify-between gap-3 rounded-xl border p-4 sm:flex-row sm:items-center"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold">{venue.name}</h3>
+                      <StatusBadge status={venue.status} />
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {venue.address} · {venue.courts.length} courts
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {venue.address} · {venue.courts.length} courts
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {venue.status === "published" && USER_APP_URL ? (
-                    <Button variant="outline" size="sm" asChild>
-                      <a
-                        href={`${USER_APP_URL}/venues/${venue.slug}`}
-                        target="_blank"
-                        rel="noreferrer"
+                  <div className="flex items-center gap-2">
+                    {previewUrl ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={previewUrl} target="_blank" rel="noreferrer">
+                          Preview
+                        </a>
+                      </Button>
+                    ) : null}
+                    {venue.status === "draft" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={
+                          submitMutation.isPending ||
+                          venue.courts.length === 0 ||
+                          phonePending
+                        }
+                        onClick={() => submitForReview(venue.id)}
                       >
-                        Preview
-                      </a>
-                    </Button>
-                  ) : null}
-                  {venue.status === "draft" ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={
-                        submitMutation.isPending ||
-                        venue.courts.length === 0 ||
-                        phonePending
-                      }
-                      onClick={() => submitForReview(venue.id)}
-                    >
-                      <Send />
-                      Submit for review
-                    </Button>
-                  ) : null}
+                        <Send />
+                        Submit for review
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </CardContent>
         </Card>
       ) : null}

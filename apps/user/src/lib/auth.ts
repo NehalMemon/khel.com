@@ -3,7 +3,13 @@ import type { Database, UserRole } from "@/lib/database.types"
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-browser"
 import { getAuthErrorMessage, normalizePhone } from "@/lib/utils"
 
-export type PublicSignupRole = Extract<UserRole, "customer" | "venue_owner">
+/**
+ * The customer app is the only place a public signup form exists, and it may
+ * only ever create a `customer`. Venue owners sign up in
+ * `apps/venue-owner`, and admin roles are never self-service. Narrowing the
+ * type means a future form cannot widen this by accident.
+ */
+export type PublicSignupRole = Extract<UserRole, "customer">
 
 export type SignUpInput = {
   name: string
