@@ -34,6 +34,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_config: {
+        Row: {
+          commission_rate: number
+          default_search_radius_km: number
+          hold_expiry_minutes: number
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          commission_rate?: number
+          default_search_radius_km?: number
+          hold_expiry_minutes?: number
+          id: number
+          updated_at?: string
+        }
+        Update: {
+          commission_rate?: number
+          default_search_radius_km?: number
+          hold_expiry_minutes?: number
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           booking_ref: string
@@ -158,6 +182,42 @@ export type Database = {
           },
         ]
       }
+      hold_logs: {
+        Row: {
+          created_at: string
+          id: string
+          slot_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          slot_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          slot_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hold_logs_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hold_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -166,6 +226,7 @@ export type Database = {
           name: string
           phone: string
           role: Database["public"]["Enums"]["user_role"]
+          subscription_tier: string
           updated_at: string
         }
         Insert: {
@@ -175,6 +236,7 @@ export type Database = {
           name: string
           phone: string
           role?: Database["public"]["Enums"]["user_role"]
+          subscription_tier?: string
           updated_at?: string
         }
         Update: {
@@ -184,6 +246,7 @@ export type Database = {
           name?: string
           phone?: string
           role?: Database["public"]["Enums"]["user_role"]
+          subscription_tier?: string
           updated_at?: string
         }
         Relationships: []
@@ -297,6 +360,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      confirm_booking_with_payment: {
+        Args: {
+          p_amount_paid: number
+          p_booking_id: string
+          p_gateway_ref: string
+        }
+        Returns: string
+      }
       hold_slot: {
         Args: { p_court_id: string; p_date: string; p_start_time: string }
         Returns: {
@@ -305,6 +376,19 @@ export type Database = {
         }[]
       }
       is_admin: { Args: never; Returns: boolean }
+      search_venues_nearby: {
+        Args: { p_lat: number; p_lon: number; p_radius_km: number }
+        Returns: {
+          address: string
+          amenities: Json
+          avg_rating: number
+          distance_km: number
+          id: string
+          images: Json
+          name: string
+          slug: string
+        }[]
+      }
     }
     Enums: {
       booking_status:

@@ -108,14 +108,106 @@ To upload an image, the frontend must execute a two-step process:
 
 ---
 
-## [Feature] Atomic Slot Holding (Checkout Flow)
+## [Feature] Atomic Slot Holding with Freemium Quotas (Checkout Flow)
 ### Backend Status
-Completed. `hold_slot` RPC deployed with strict concurrency control and automatic stale-hold resolution.
+- **Status:** Completed
+- **Branch / PR:** `staging`
+- **Migrations / Functions:**
+  - Migration: `supabase/migrations/20260925123004_add_freemium_holds.sql`
+  - Table Update: `public.profiles` (`subscription_tier TEXT NOT NULL DEFAULT 'free'` with check constraint `'free' | 'premium'`)
+  - Table: `public.hold_logs` (`id`, `user_id`, `slot_id`, `created_at`) with RLS enabled
+  - RPC: `public.hold_slot(p_court_id UUID, p_date DATE, p_start_time TIME)` (`SECURITY DEFINER`, `SET search_path = public`)
+  - Security Trigger: `trg_protect_profile_tier_and_role` on `public.profiles` preventing unauthorized tier/role self-promotion
+- **Notes:** High-concurrency race condition protection is strictly preserved by executing `SELECT ... FOR UPDATE SKIP LOCKED` on `public.slots` as Step 1. The subscription quota is verified subsequent to slot locking; if a free user has already held a slot within the last 7 days (`created_at > now() - interval '7 days'`), the transaction is aborted with `'freemium_limit_reached'`, automatically rolling back and releasing the slot lock. Premium users have unlimited holds.
 
 ### Database API / Supabase Usage
-To initiate checkout, the frontend must call the RPC:
-`const { data, error } = await supabase.rpc('hold_slot', { p_court_id, p_date, p_start_time })`
+- **Client Method:**
+  ```typescript
+  const { data, error } = await supabase.rpc('hold_slot', {
+    p_court_id: courtId,
+    p_date: selectedDate, // 'YYYY-MM-DD'
+    p_start_time: startTime, // 'HH:MM:SS'
+  });
+  ```
+- **Expected Payload:**
+  - `p_court_id`: `string` (UUID)
+  - `p_date`: `string` (ISO Date: 'YYYY-MM-DD')
+  - `p_start_time`: `string` (Time: 'HH:MM:SS')
+- **Response Format:**
+  - Returns `Array<{ slot_id: string, held_until: string }>` on success.
+- **Error Exceptions Thrown:**
+  - `'Slot is not available'`: The requested slot is already booked, currently held by an active session, or does not exist.
+  - `'freemium_limit_reached'`: The authenticated user is on the `'free'` subscription tier and has already reached their limit of 1 slot hold per 7 days.
+  - `'Not authenticated'`: The caller is not logged in.
 
 ### Frontend UI/UX Requirements
-- The UI must immediately capture any RPC errors (e.g., 'Slot is not available') and show a specific UI state informing the customer the slot was just taken by someone else, rather than a generic error.
-- Use the returned `held_until` timestamp to drive a strict 5-minute countdown timer on the checkout screen.
+- **Target Components / Views:**
+  - Checkout / Slot selection flow (e.g., `web/src/pages/VenueDetail.tsx` or booking modal).
+- **Error Catching & Modal Trigger:**
+  - The UI **must explicitly catch** the error message `'freemium_limit_reached'`.
+  - When this error occurs, intercept it and **display an 'Upgrade to Premium' UI modal / paywall sheet** explaining that Free users can only hold 1 slot every 7 days, prompting them to upgrade to Premium for unlimited instant holds.
+  - Do **not** display a generic alert or error toast for `'freemium_limit_reached'`.
+- **Slot Unavailable Handling:**
+  - Catch `'Slot is not available'` and display a real-time banner or alert indicating the slot was just snagged by another player.
+- **Timer Handling:**
+  - On success, use the returned `held_until` timestamp to drive the 5-minute checkout countdown timer.
+
+---
+
+## [Feature] Spatial Venue Discovery (Near Me)
+### Backend Status
+Completed. PostGIS RPC `search_venues_nearby` deployed with spatial indexing.
+
+### Database API / Supabase Usage
+To load the venue feed, the Next.js server component (or TanStack Query hook) must call:
+`const { data, error } = await supabase.rpc('search_venues_nearby', { p_lat: userLat, p_lon: userLon, p_radius_km: 10 })`
+
+### Frontend UI/UX Requirements
+- Prompt the user for HTML5 Geolocation permissions on the Discover page.
+- If denied, fallback to central Karachi coordinates (e.g., Lat: 24.8607, Lon: 67.0011) so the UI doesn't break.
+- Provide a manual "Search by Area" dropdown (e.g., Clifton, Gulshan) for users who prefer not to share GPS data.
+- Display the returned `distance_km` on the venue cards (e.g., '1.2 km away').
+
+---
+
+## [Feature] Platform Configuration
+### Backend Status
+- **Status:** Completed
+- **Branch / PR:** `staging`
+- **Migrations:** `supabase/migrations/20260925142542_create_app_config.sql`
+- **Table:** `public.app_config` (Singleton table with `id = 1` constraint)
+- **RLS:** Read-only for `anon` and `authenticated`; updates strictly restricted to verified platform admins via `public.is_admin()`. `INSERT` and `DELETE` remain completely blocked.
+
+### Database API / Supabase Usage
+On application initialization (or in a global React Context / TanStack Query provider), query the singleton configuration row:
+```typescript
+const { data: config, error } = await supabase
+  .from('app_config')
+  .select('commission_rate, default_search_radius_km, hold_expiry_minutes')
+  .eq('id', 1)
+  .single()
+```
+
+### Frontend UI/UX Requirements
+- **Anti-Hardcoding Rule:** Do **not** hardcode business rules, search radiuses, or checkout countdown timers in components.
+- **Search Radius:** Use `config.default_search_radius_km` (default: `10`) when querying `search_venues_nearby` or initializing the discover feed radius slider/dropdown.
+- **Checkout Countdown:** Use `config.hold_expiry_minutes` (default: `5`) to dynamically drive the checkout hold expiration UI and warning notifications.
+- **Commission Calculations:** Use `config.commission_rate` (default: `0.00`) for customer payment breakdowns and partner payout calculations.
+
+---
+
+## [Feature] Checkout & Payment Ledger
+### Backend Status
+Completed. The `confirm_booking_with_payment` RPC is deployed.
+
+### Database API / Supabase Usage
+**CRITICAL:** The frontend must NEVER call `confirm_booking_with_payment` directly. 
+- The frontend is only responsible for initiating the payment session with the chosen payment gateway.
+- Once the gateway succeeds, it will fire a server-to-server webhook to our Supabase Edge Function, which will securely call this RPC to finalize the ledger.
+
+### Frontend UI/UX Requirements
+- On the checkout page, after the payment gateway redirects the user back to Khel.com, query the `bookings` table for `payment_status`. 
+- Show a loading spinner until `payment_status` changes to `'paid'`, then display the final confirmation receipt.
+
+
+
