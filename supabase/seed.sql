@@ -1,5 +1,3 @@
--- supabase/seed.sql
-
 -- --------------------------------------------------------
 -- 0. Auth Users (Required to satisfy profiles.id -> auth.users.id FK)
 -- --------------------------------------------------------
@@ -69,7 +67,6 @@ ON CONFLICT (id) DO NOTHING;
 
 -- --------------------------------------------------------
 -- 2. Venues (PostGIS coordinates for Karachi)
--- Note: UUIDs must be hexadecimal (0-9, a-f), so d100... / d200... is used in place of non-hex v100...
 -- --------------------------------------------------------
 INSERT INTO public.venues (id, owner_id, name, slug, description, address, coordinates, status, avg_rating, amenities, created_at, updated_at)
 VALUES
@@ -108,28 +105,52 @@ ON CONFLICT (id) DO NOTHING;
 -- --------------------------------------------------------
 INSERT INTO public.courts (id, venue_id, name, sport_type, hourly_rate, metadata, created_at, updated_at)
 VALUES
+  -- Bahadurabad Futsal Arena
   ('c1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'Pitch A (5v5)', 'Futsal', 3000.00, '{"surface": "artificial_turf", "dimension": "30x20m"}', now(), now()),
   ('c2000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000001', 'Pitch B (7v7)', 'Futsal', 5000.00, '{"surface": "artificial_turf", "dimension": "40x25m"}', now(), now()),
-  ('c3000000-0000-0000-0000-000000000003', 'd2000000-0000-0000-0000-000000000002', 'Court 1 (Wooden)', 'Badminton', 1200.00, '{"surface": "wood", "net_included": true}', now(), now())
+  
+  -- Gulshan Badminton Hub
+  ('c3000000-0000-0000-0000-000000000003', 'd2000000-0000-0000-0000-000000000002', 'Court 1 (Wooden)', 'Badminton', 1200.00, '{"surface": "wood", "net_included": true}', now(), now()),
+  ('c4000000-0000-0000-0000-000000000004', 'd2000000-0000-0000-0000-000000000002', 'Court 2 (Synthetic)', 'Badminton', 1500.00, '{"surface": "synthetic", "net_included": true}', now(), now()),
+  ('c5000000-0000-0000-0000-000000000005', 'd2000000-0000-0000-0000-000000000002', 'Court 3 (VIP)', 'Badminton', 2000.00, '{"surface": "wood", "air_conditioned": true}', now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 -- --------------------------------------------------------
--- 4. Slots (Available inventory for the upcoming days)
+-- 4. Slots (Distinct court + date + start_time pairings)
 -- --------------------------------------------------------
 INSERT INTO public.slots (id, court_id, date, start_time, end_time, status)
 VALUES
-  -- Bahadurabad Futsal Pitch A
+  -- Bahadurabad Pitch A
+  (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE,     '18:00:00', '19:00:00', 'available'),
+  (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE,     '19:00:00', '20:00:00', 'available'),
   (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE + 1, '18:00:00', '19:00:00', 'available'),
   (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE + 1, '19:00:00', '20:00:00', 'available'),
   (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE + 1, '20:00:00', '21:00:00', 'available'),
   (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE + 1, '21:00:00', '22:00:00', 'available'),
-  
-  -- Bahadurabad Futsal Pitch B
+
+  -- Bahadurabad Pitch B
   (gen_random_uuid(), 'c2000000-0000-0000-0000-000000000002', CURRENT_DATE + 1, '19:00:00', '20:00:00', 'available'),
   (gen_random_uuid(), 'c2000000-0000-0000-0000-000000000002', CURRENT_DATE + 1, '20:00:00', '21:00:00', 'available'),
   (gen_random_uuid(), 'c2000000-0000-0000-0000-000000000002', CURRENT_DATE + 1, '21:00:00', '22:00:00', 'available'),
 
-  -- Gulshan Badminton Court 1
+  -- Gulshan Court 1 (Today)
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE,     '16:00:00', '17:00:00', 'available'),
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE,     '17:00:00', '18:00:00', 'available'),
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE,     '18:00:00', '19:00:00', 'available'),
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE,     '19:00:00', '20:00:00', 'available'),
+
+  -- Gulshan Court 1 (Tomorrow & Day After)
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 1, '18:00:00', '19:00:00', 'available'),
   (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 2, '17:00:00', '18:00:00', 'available'),
   (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 2, '18:00:00', '19:00:00', 'available'),
-  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 2, '19:00:00', '20:00:00', 'available');
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 2, '19:00:00', '20:00:00', 'available'),
+
+  -- Gulshan Court 2 (Today)
+  (gen_random_uuid(), 'c4000000-0000-0000-0000-000000000004', CURRENT_DATE,     '17:00:00', '18:00:00', 'available'),
+  (gen_random_uuid(), 'c4000000-0000-0000-0000-000000000004', CURRENT_DATE,     '18:00:00', '19:00:00', 'available'),
+  (gen_random_uuid(), 'c4000000-0000-0000-0000-000000000004', CURRENT_DATE,     '19:00:00', '20:00:00', 'available'),
+
+  -- Gulshan Court 3 (Today)
+  (gen_random_uuid(), 'c5000000-0000-0000-0000-000000000005', CURRENT_DATE,     '20:00:00', '21:00:00', 'available'),
+  (gen_random_uuid(), 'c5000000-0000-0000-0000-000000000005', CURRENT_DATE,     '21:00:00', '22:00:00', 'available')
+ON CONFLICT DO NOTHING;

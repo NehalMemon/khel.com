@@ -13,3 +13,8 @@
 ### 2. Safepay Widget Integration
 - [ ] Wire the frontend checkout button to launch the Safepay widget using the public key.
 - [ ] **CRITICAL:** Pass the active `booking_id` into the Safepay widget's `metadata` object during initialization. (Our Edge Function needs this metadata attached to the webhook to update the correct ledger entry).
+
+
+### 4. UI/UX Improvements: Booking Flow
+- [ ] **Clean URLs (State Management):** Refactor the booking page to manage the selected `courtId` and `date` using internal React State (e.g., `useState`, Context, or Zustand) instead of appending the long UUIDs to the URL query parameters. This will make the URLs much cleaner for users.
+- [ ] **Auto-Load Defaults:** Prevent the "empty screen" effect when a user first lands on the booking page. Automatically select the first available court by default and auto-load the slots for `today` so the user is immediately presented with clickable time slots.
