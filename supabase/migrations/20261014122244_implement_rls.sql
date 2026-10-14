@@ -7,7 +7,6 @@ ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
 
 -- 2. App Config Policies
--- Everyone can read the config, no one can write via API
 CREATE POLICY "App config is viewable by everyone" 
   ON public.app_config FOR SELECT USING (true);
 
@@ -43,7 +42,7 @@ CREATE POLICY "Courts of published venues are viewable by everyone"
     EXISTS (SELECT 1 FROM public.venues v WHERE v.id = courts.venue_id AND v.status = 'published'::venue_status)
   );
 CREATE POLICY "Owners can manage courts" 
-  ON public.courts ALL USING (
+  ON public.courts FOR ALL USING (
     EXISTS (SELECT 1 FROM public.venues v WHERE v.id = courts.venue_id AND v.owner_id = auth.uid())
   );
 
@@ -53,7 +52,7 @@ CREATE POLICY "Slots of published venues are viewable by everyone"
     EXISTS (SELECT 1 FROM public.courts c JOIN public.venues v ON c.venue_id = v.id WHERE c.id = slots.court_id AND v.status = 'published'::venue_status)
   );
 CREATE POLICY "Owners can manage slots" 
-  ON public.slots ALL USING (
+  ON public.slots FOR ALL USING (
     EXISTS (SELECT 1 FROM public.courts c JOIN public.venues v ON c.venue_id = v.id WHERE c.id = slots.court_id AND v.owner_id = auth.uid())
   );
 
@@ -75,7 +74,6 @@ CREATE POLICY "Owners can update their venue bookings"
 CREATE OR REPLACE FUNCTION public.restrict_booking_financial_updates()
 RETURNS trigger AS $$
 BEGIN
-  -- If the payload attempts to change money/status columns, reject it.
   IF OLD.total_charged IS DISTINCT FROM NEW.total_charged OR
      OLD.payment_status IS DISTINCT FROM NEW.payment_status OR
      OLD.venue_payout_amount IS DISTINCT FROM NEW.venue_payout_amount THEN
@@ -85,7 +83,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Apply the trigger ONLY to standard authenticated users (allows Edge Functions using Service Role to still update payments)
 CREATE TRIGGER enforce_financial_security
 BEFORE UPDATE ON public.bookings
 FOR EACH ROW
