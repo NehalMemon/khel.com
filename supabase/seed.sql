@@ -133,3 +133,70 @@ VALUES
   (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 2, '17:00:00', '18:00:00', 'available'),
   (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 2, '18:00:00', '19:00:00', 'available'),
   (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 2, '19:00:00', '20:00:00', 'available');
+
+
+-- --------------------------------------------------------
+-- 5. Mock Booking (For Safepay Webhook Testing)
+-- --------------------------------------------------------
+INSERT INTO public.bookings (
+  id, 
+  booking_ref, 
+  customer_id, 
+  venue_id, 
+  court_id, 
+  status, 
+  payment_status, 
+  total_charged, 
+  venue_payout_amount
+) VALUES (
+  'f1111111-1111-1111-1111-111111111111', 
+  'REF-TEST-001', 
+  'c0000000-0000-0000-0000-000000000003', -- Test Player
+  'd1000000-0000-0000-0000-000000000001', -- Bahadurabad Arena
+  'c1000000-0000-0000-0000-000000000001', -- Pitch A
+  'confirmed', 
+  'pending', 
+  3000.00, 
+  2700.00
+) ON CONFLICT (id) DO NOTHING;
+
+-- --------------------------------------------------------
+-- 3. Courts (Expanded for UI Testing)
+-- --------------------------------------------------------
+INSERT INTO public.courts (id, venue_id, name, sport_type, hourly_rate, metadata, created_at, updated_at)
+VALUES
+  -- Bahadurabad Futsal Arena
+  ('c1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'Pitch A (5v5)', 'Futsal', 3000.00, '{"surface": "artificial_turf", "dimension": "30x20m"}', now(), now()),
+  ('c2000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000001', 'Pitch B (7v7)', 'Futsal', 5000.00, '{"surface": "artificial_turf", "dimension": "40x25m"}', now(), now()),
+  
+  -- Gulshan Badminton Hub (Expanded to 3 Courts)
+  ('c3000000-0000-0000-0000-000000000003', 'd2000000-0000-0000-0000-000000000002', 'Court 1 (Wooden)', 'Badminton', 1200.00, '{"surface": "wood", "net_included": true}', now(), now()),
+  ('c4000000-0000-0000-0000-000000000004', 'd2000000-0000-0000-0000-000000000002', 'Court 2 (Synthetic)', 'Badminton', 1500.00, '{"surface": "synthetic", "net_included": true}', now(), now()),
+  ('c5000000-0000-0000-0000-000000000005', 'd2000000-0000-0000-0000-000000000002', 'Court 3 (VIP)', 'Badminton', 2000.00, '{"surface": "wood", "air_conditioned": true}', now(), now())
+ON CONFLICT (id) DO NOTHING;
+
+-- --------------------------------------------------------
+-- 4. Slots (Expanded Inventory)
+-- --------------------------------------------------------
+INSERT INTO public.slots (id, court_id, date, start_time, end_time, status)
+VALUES
+  -- Bahadurabad Pitch A (Today & Tomorrow)
+  (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE, '18:00:00', '19:00:00', 'available'),
+  (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE, '19:00:00', '20:00:00', 'available'),
+  (gen_random_uuid(), 'c1000000-0000-0000-0000-000000000001', CURRENT_DATE + 1, '18:00:00', '19:00:00', 'available'),
+  
+  -- Gulshan Court 1 (Wooden) - Full Evening Schedule
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE, '16:00:00', '17:00:00', 'available'),
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE, '17:00:00', '18:00:00', 'available'),
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE, '18:00:00', '19:00:00', 'available'),
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE, '19:00:00', '20:00:00', 'available'),
+  (gen_random_uuid(), 'c3000000-0000-0000-0000-000000000003', CURRENT_DATE + 1, '18:00:00', '19:00:00', 'available'),
+
+  -- Gulshan Court 2 (Synthetic)
+  (gen_random_uuid(), 'c4000000-0000-0000-0000-000000000004', CURRENT_DATE, '17:00:00', '18:00:00', 'available'),
+  (gen_random_uuid(), 'c4000000-0000-0000-0000-000000000004', CURRENT_DATE, '18:00:00', '19:00:00', 'available'),
+  (gen_random_uuid(), 'c4000000-0000-0000-0000-000000000004', CURRENT_DATE, '19:00:00', '20:00:00', 'available'),
+
+  -- Gulshan Court 3 (VIP)
+  (gen_random_uuid(), 'c5000000-0000-0000-0000-000000000005', CURRENT_DATE, '20:00:00', '21:00:00', 'available'),
+  (gen_random_uuid(), 'c5000000-0000-0000-0000-000000000005', CURRENT_DATE, '21:00:00', '22:00:00', 'available');
