@@ -11,6 +11,9 @@ export type BookingStatus = Enums<"booking_status">
 export type PaymentStatus = Enums<"payment_status">
 export type MediaStatus = Enums<"media_status">
 
+export type ApplicationStatus = Enums<"application_status">
+
+/** Roles a public signup form is allowed to request. Admin roles are never self-service. */
 export type PublicSignupRole = Extract<UserRole, "customer" | "venue_owner">
 
 /**
@@ -52,6 +55,12 @@ export type BookingUpdate = Partial<Pick<BookingInsert, "status">>
 export type VenueTeamRow = Tables<"venue_team">
 export type VenueTeamInsert = TablesInsert<"venue_team">
 export type VenueTeamUpdate = Partial<Pick<VenueTeamInsert, "permissions">>
+
+export type VenueApplicationRow = Tables<"venue_applications">
+export type VenueApplicationInsert = TablesInsert<"venue_applications">
+export type VenueApplicationUpdate = Partial<
+  Pick<VenueApplicationInsert, "applicant_name" | "email" | "phone" | "venue_name" | "venue_address" | "status" | "admin_notes">
+>
 
 export type NearbyVenueRow = GeneratedDatabase["public"]["Functions"]["search_venues_nearby"]["Returns"][number]
 export type HoldSlotResult = GeneratedDatabase["public"]["Functions"]["hold_slot"]["Returns"][number]
