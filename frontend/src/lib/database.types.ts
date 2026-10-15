@@ -65,7 +65,8 @@ export type PublicSignupRole = Extract<UserRole, "customer" | "venue_owner">
 export type ProfileRow = {
   id: string
   name: string
-  phone: string
+  email: string | null
+  phone: string | null
   avatar_url: string | null
   role: UserRole
   subscription_tier: SubscriptionTier
@@ -76,7 +77,8 @@ export type ProfileRow = {
 export type ProfileInsert = {
   id: string
   name: string
-  phone: string
+  email?: string | null
+  phone?: string | null
   avatar_url?: string | null
   role?: UserRole
   subscription_tier?: SubscriptionTier
@@ -90,7 +92,7 @@ export type ProfileInsert = {
  * changes to those columns, and customer/owner profile forms must never offer
  * to write them.
  */
-export type ProfileUpdate = Partial<Pick<ProfileInsert, "name" | "phone" | "avatar_url">>
+export type ProfileUpdate = Partial<Pick<ProfileInsert, "name" | "email" | "phone" | "avatar_url">>
 
 /**
  * Admin-console update. The same trigger still guards these writes, but it
@@ -98,7 +100,7 @@ export type ProfileUpdate = Partial<Pick<ProfileInsert, "name" | "phone" | "avat
  * and tier on behalf of support and finance staff.
  */
 export type ProfilePrivilegedUpdate = Partial<
-  Pick<ProfileInsert, "name" | "phone" | "avatar_url" | "role" | "subscription_tier">
+  Pick<ProfileInsert, "name" | "email" | "phone" | "avatar_url" | "role" | "subscription_tier">
 >
 
 export type AppConfigRow = {
@@ -237,6 +239,26 @@ export type BookingInsert = {
 
 export type BookingUpdate = Partial<Pick<BookingInsert, "status">>
 
+export type VenueTeamRow = {
+  id: string
+  venue_id: string
+  user_id: string
+  permissions: Json
+  created_at: string
+  updated_at: string
+}
+
+export type VenueTeamInsert = {
+  id?: string
+  venue_id: string
+  user_id: string
+  permissions?: Json
+  created_at?: string
+  updated_at?: string
+}
+
+export type VenueTeamUpdate = Partial<Pick<VenueTeamInsert, "permissions">>
+
 /** Exact return shape of `public.search_venues_nearby`. */
 export type NearbyVenueRow = {
   id: string
@@ -279,6 +301,7 @@ export type Database = {
       slots: TableDefinition<SlotRow, SlotInsert, SlotRecordUpdate>
       hold_logs: TableDefinition<HoldLogRow, HoldLogRow, Partial<HoldLogRow>>
       bookings: TableDefinition<BookingRow, BookingInsert, BookingUpdate>
+      venue_team: TableDefinition<VenueTeamRow, VenueTeamInsert, VenueTeamUpdate>
     }
     Views: { [_ in never]: never }
     Functions: {
