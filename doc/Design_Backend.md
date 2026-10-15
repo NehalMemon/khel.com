@@ -50,3 +50,43 @@ Already shipped (per the Backend→Frontend Handoff doc, `staging` branch): migr
 9. **Refund flow** — `payment_status = 'refunded'` exists as a state with no process behind it yet. The admin console can filter and display it but not initiate it.
 10. **`booking_ref` prefix** — `SCHEMA.md` shows `KHEL-7F3K2`, `API_CONTRACTS.md` shows `ISB-9X2P` (likely a leftover from an earlier working name). `KHEL-` looks like the intended one.
 11. **`web/src/types/database.types.ts` is stale** — it declared a `courts.sport_id` column that no migration ever creates. The frontend has removed those entries and the three app mirrors are now the maintained source of truth, but the file is the one the `/audit` workflow still points at, so it will drift again unless it is either regenerated or retired.
+
+## 6. Safepay Checkout — Advisory Notes From Frontend Wiring (2026-10-15)
+
+> Observations from the frontend-only `abid-dev` branch while wiring the checkout seam
+> (`frontend/src/lib/queries/checkout.ts`). These are requests/flag-flags for the backend
+> owner, not changes made here — nothing under `supabase/` was touched.
+
+1. **Need a server-side call that creates a pending booking and a Safepay session.**
+   The frontend's `createPendingBooking(slotId)` seam currently throws
+   `PaymentBackendNotReadyError` because there is still no client-callable contract that
+   creates a booking (see §5 item 8). The frontend needs one Edge Function (or RPC) that,
+   in a single server-side step: inserts a `pending` booking for the slot, computes the
+   amount (the browser must never decide price/commission/availability), creates the
+   Safepay session with `metadata.booking_id = <id>`, and returns
+   `{ booking_id, booking_ref, amount }` (plus the Safepay session `tracker`/`tbt` — see #4).
+
+2. **`safepay-webhook` never marks the slot `booked`.**
+   `supabase/functions/safepay-webhook/index.ts` (~lines 148–155) updates
+   `bookings.payment_status` / `payment_gateway_ref` directly and does **not** call
+   `confirm_booking_with_payment(...)`, which is the function that would set the slot to
+   `booked`. Combined with `release_expired_holds()`
+   (`supabase/migrations/20261014115728_release_expired_holds_cron.sql`), which every minute
+   flips any `held` slot with `held_until < now()` back to `available`, a paid booking's slot
+   is released after the hold window and can be **double-booked**. Either the webhook should
+   call `confirm_booking_with_payment`, or the cleanup must skip slots that have a paid
+   booking.
+
+3. **Webhook signature verification is a stub.**
+   Same file, ~lines 69–82: the HMAC key is imported from `SAFEPAY_SECRET_KEY` but
+   `crypto.subtle.verify` is never called — the comment literally says "assuming successful
+   verification." Any POST carrying a signature header is accepted, and if the env var is
+   unset the check is skipped entirely. Needs completing before production.
+
+4. **Local webhook testing needs a public URL.**
+   Safepay cannot reach `127.0.0.1`, so a local stack cannot receive a real callback. To
+   test: run `supabase functions serve safepay-webhook --no-verify-jwt`, expose it with a
+   tunnel (e.g. ngrok) and register the tunnel URL in the Safepay sandbox dashboard; or
+   invoke it manually with a crafted `{ "event": "payment.succeeded", "tracker": "...",
+   "metadata": { "booking_id": "..." } }` body. Worth documenting the chosen approach
+   alongside the webhook contract.
