@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
-import type { Database } from "@/lib/database.types"
+import type { Database } from "@/types/database.types"
 
 /**
  * Single route guard for the whole app (Next 16's `proxy.ts` is the renamed

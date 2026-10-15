@@ -4,10 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { ProfileUpdate } from "@/lib/database.types"
 import {
   cancelCustomerBooking,
+  fetchCustomerBookingByRef,
   fetchCustomerBookings,
   fetchNearbyVenues,
   fetchPublishedVenues,
   fetchSlots,
+  fetchSlotsForCourts,
   fetchVenueBySlug,
   holdSlot,
   type VenueFilters,
@@ -65,11 +67,37 @@ export function useAvailableSlots(courtId: string | null, date: string) {
   })
 }
 
+/**
+ * One request for every court of a venue on a date. The booking page renders
+ * availability across all courts from this single query, so it never fans out
+ * into one `useAvailableSlots` per court.
+ */
+export function useAvailableSlotsForCourts(courtIds: string[], date: string) {
+  const sortedIds = [...courtIds].sort()
+  return useQuery({
+    queryKey: ["slots", "available", "courts", sortedIds, date],
+    queryFn: () => fetchSlotsForCourts(sortedIds, date, "available"),
+    enabled: sortedIds.length > 0 && Boolean(date),
+  })
+}
+
 export function useCustomerBookings(userId: string | null) {
   return useQuery({
     queryKey: ["bookings", "customer", userId],
     queryFn: () => fetchCustomerBookings(userId as string),
     enabled: Boolean(userId),
+  })
+}
+
+/**
+ * A single booking by reference, for the confirmation page. The page polls this
+ * itself (via `refetch`) while the payment is pending, so no interval lives here.
+ */
+export function useCustomerBookingByRef(userId: string | null, bookingRef: string) {
+  return useQuery({
+    queryKey: ["bookings", "customer", userId, "ref", bookingRef],
+    queryFn: () => fetchCustomerBookingByRef(userId as string, bookingRef),
+    enabled: Boolean(userId && bookingRef),
   })
 }
 
