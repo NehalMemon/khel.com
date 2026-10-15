@@ -40,7 +40,7 @@ export type NearbyVenue = PublicVenueWithCourts & {
 
 const publicVenueFields =
   "id, name, slug, description, address, coordinates, area_id, status, avg_rating, amenities, created_at, updated_at"
-/** `courts` has no `sport_id` column; `sport_type` is the only sport field. */
+/** Public court fields; `sport_type` is the display label. */
 const courtFields =
   "id, venue_id, name, sport_type, hourly_rate, metadata, created_at, updated_at"
 const publicSlotFields =
@@ -220,6 +220,31 @@ export async function fetchSlots(
 }
 
 /**
+ * Slots for every court of a venue on one date, in a single request.
+ *
+ * The booking page needs availability across all the venue's courts at once to
+ * pick a default court and to render the grid, so it must not fall back to one
+ * request per court. `court_id` is the only venue link on `slots`, so the filter
+ * is an `in` over the venue's court ids.
+ */
+export async function fetchSlotsForCourts(
+  courtIds: string[],
+  date: string,
+  status?: SlotStatus,
+): Promise<PublicSlotRow[]> {
+  if (!isSupabaseConfigured() || courtIds.length === 0) return []
+  let request = getSupabaseBrowserClient()
+    .from("slots")
+    .select(publicSlotFields)
+    .in("court_id", courtIds)
+    .eq("date", date)
+  if (status) request = request.eq("status", status)
+  const { data, error } = await request.order("start_time")
+  handleError(error)
+  return (data ?? []) as PublicSlotRow[]
+}
+
+/**
  * `public.hold_slot` (migration 20260925123004) is the only supported way to
  * reserve inventory. It returns `RETURNS TABLE (slot_id, held_until)`, so the
  * caller keeps its own copy of the selected public slot and only the hold id
@@ -259,6 +284,27 @@ export async function fetchCustomerBookings(userId: string): Promise<CustomerBoo
     .order("created_at", { ascending: false })
   handleError(error)
   return (data ?? []) as CustomerBookingRow[]
+}
+
+/**
+ * A single booking by its `booking_ref`, scoped to the signed-in customer.
+ * `booking_ref` is UNIQUE, and the `customer_id` filter keeps the row-level
+ * policy honest even if a ref is guessed. The confirmation page polls this to
+ * watch `payment_status` move from `pending` to `paid`/`failed`.
+ */
+export async function fetchCustomerBookingByRef(
+  userId: string,
+  bookingRef: string,
+): Promise<CustomerBookingRow | null> {
+  if (!isSupabaseConfigured()) return null
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("bookings")
+    .select(customerBookingFields)
+    .eq("customer_id", userId)
+    .eq("booking_ref", bookingRef)
+    .maybeSingle()
+  handleError(error)
+  return (data ?? null) as CustomerBookingRow | null
 }
 
 async function setBookingStatus(
