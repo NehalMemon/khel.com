@@ -38,3 +38,12 @@ The frontend must strictly adhere to the following backend rules:
    * *Required UI Catch 2:* If it throws `'freemium_limit_reached'`, trigger an "Upgrade to Premium" paywall modal.
    * *Countdown:* Use the returned `held_until` timestamp to drive a strict 5-minute countdown on the checkout screen.
 * **Payment Ledger:** The frontend must **never** call `confirm_booking_with_payment` directly. The frontend initiates the gateway session; the gateway's server-to-server webhook hits our Edge Function, which securely finalizes the database ledger. The frontend simply polls or listens to the `bookings.payment_status` to transition from `pending` to `paid`.
+
+## 5. Admin Architecture, RAM & Realtime Notifications
+
+1. **Admin Panel Layout:** The `/admin` route group uses a dedicated sidebar layout (`AdminShell`), completely separated from the customer-facing UI, providing focused operational navigation, responsive drawer support, and immediate sign-out capabilities.
+2. **Admin RAM (Role-Based Access):** Admin routes and UI components must verify granular permissions stored in the `platform_permissions` JSONB array of the user's profile (`profiles.platform_permissions`). Sensitive mutation elements (such as "Approve" or "Reject" buttons for venue applications) must only be rendered if the admin possesses `"manage_applications"` or `"all"`.
+3. **Notification State & Realtime:** The application utilizes a global React Context provider (`NotificationProvider`) wrapping the component tree to:
+   * Fetch unread notifications on initial load for the authenticated user.
+   * Subscribe to realtime PostgreSQL changes (`INSERT` and `UPDATE`) on the `public.notifications` table filtered by `user_id = auth.uid()` using Supabase Realtime channels.
+   * Maintain unread counts and feed updates seamlessly across navbar bells, popovers, and status toasts.

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type {
+  ApplicationStatus,
   SubscriptionTier,
   UserRole,
   VenueStatus,
@@ -12,11 +13,13 @@ import {
   fetchAllVenues,
   fetchProfiles,
   fetchReviewVenues,
+  fetchVenueApplications,
   updateAppConfig,
   updateCourt,
   updateProfileRole,
   updateProfileTier,
   updateReviewStatus,
+  updateVenueApplicationStatus,
 } from "@/lib/queries/admin"
 import type { AppConfigValues } from "@/lib/queries/admin"
 
@@ -121,4 +124,22 @@ export function useUpdateAppConfigMutation() {
   return useAdminMutation<AppConfigValues, unknown>(updateAppConfig, [
     ["app-config"],
   ])
+}
+
+export function useVenueApplications(status?: ApplicationStatus) {
+  return useQuery({
+    queryKey: ["admin", "venue_applications", status ?? "all"],
+    queryFn: () => fetchVenueApplications(status),
+  })
+}
+
+export function useUpdateVenueApplicationStatusMutation() {
+  return useAdminMutation<
+    { id: string; status: ApplicationStatus; adminNotes?: string },
+    unknown
+  >(
+    ({ id, status, adminNotes }) =>
+      updateVenueApplicationStatus(id, status, adminNotes),
+    [["admin", "venue_applications"]],
+  )
 }

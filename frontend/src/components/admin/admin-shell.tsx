@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import type { ReactNode } from "react"
-import { BarChart3, Building2, CalendarRange, LayoutDashboard, LogOut, Settings2, Store, Swords, Users } from "lucide-react"
+import { BarChart3, Building2, CalendarRange, ClipboardList, LayoutDashboard, LogOut, Settings2, Store, Swords, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AdminLogo } from "@/components/app/logo"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 
 const navigation = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/applications", label: "Applications", icon: ClipboardList },
   { href: "/admin/venues/review", label: "Venue review", icon: BarChart3 },
   { href: "/admin/venues", label: "All venues", icon: Building2 },
   { href: "/admin/courts", label: "Courts", icon: Swords },

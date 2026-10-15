@@ -61,6 +61,13 @@ export type MediaStatus = "pending" | "approved" | "rejected"
 
 export type ApplicationStatus = "pending" | "approved" | "rejected"
 
+export type NotificationType =
+  | "booking_confirmed"
+  | "booking_cancelled"
+  | "application_approved"
+  | "application_rejected"
+  | "system_alert"
+
 /** Roles a public signup form is allowed to request. Admin roles are never self-service. */
 export type PublicSignupRole = Extract<UserRole, "customer" | "venue_owner">
 
@@ -72,6 +79,7 @@ export type ProfileRow = {
   avatar_url: string | null
   role: UserRole
   subscription_tier: SubscriptionTier
+  platform_permissions: Json
   created_at: string
   updated_at: string
 }
@@ -84,6 +92,7 @@ export type ProfileInsert = {
   avatar_url?: string | null
   role?: UserRole
   subscription_tier?: SubscriptionTier
+  platform_permissions?: Json
   created_at?: string
   updated_at?: string
 }
@@ -102,7 +111,7 @@ export type ProfileUpdate = Partial<Pick<ProfileInsert, "name" | "email" | "phon
  * and tier on behalf of support and finance staff.
  */
 export type ProfilePrivilegedUpdate = Partial<
-  Pick<ProfileInsert, "name" | "email" | "phone" | "avatar_url" | "role" | "subscription_tier">
+  Pick<ProfileInsert, "name" | "email" | "phone" | "avatar_url" | "role" | "subscription_tier" | "platform_permissions">
 >
 
 export type AppConfigRow = {
@@ -288,8 +297,32 @@ export type VenueApplicationInsert = {
 }
 
 export type VenueApplicationUpdate = Partial<
-  Pick<VenueApplicationInsert, "applicant_name" | "email" | "phone" | "venue_name" | "venue_address" | "status" | "admin_notes">
+  Pick<VenueApplicationInsert, "applicant_name" | "email" | "phone" | "venue_name" | "venue_address" | "status" | "admin_notes" | "updated_at">
 >
+
+export type NotificationRow = {
+  id: string
+  user_id: string
+  type: NotificationType
+  title: string
+  message: string
+  action_link: string | null
+  is_read: boolean
+  created_at: string
+}
+
+export type NotificationInsert = {
+  id?: string
+  user_id: string
+  type: NotificationType
+  title: string
+  message: string
+  action_link?: string | null
+  is_read?: boolean
+  created_at?: string
+}
+
+export type NotificationUpdate = Partial<Pick<NotificationInsert, "is_read">>
 
 /** Exact return shape of `public.search_venues_nearby`. */
 export type NearbyVenueRow = {
@@ -335,6 +368,7 @@ export type Database = {
       bookings: TableDefinition<BookingRow, BookingInsert, BookingUpdate>
       venue_team: TableDefinition<VenueTeamRow, VenueTeamInsert, VenueTeamUpdate>
       venue_applications: TableDefinition<VenueApplicationRow, VenueApplicationInsert, VenueApplicationUpdate>
+      notifications: TableDefinition<NotificationRow, NotificationInsert, NotificationUpdate>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -361,6 +395,7 @@ export type Database = {
       payment_status: PaymentStatus
       media_status: MediaStatus
       application_status: ApplicationStatus
+      notification_type: NotificationType
     }
     CompositeTypes: { [_ in never]: never }
   }

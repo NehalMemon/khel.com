@@ -8,7 +8,7 @@ import { isPendingPhone } from "@/lib/utils"
  * on signup (see `doc/HANDOFF.md`).
  */
 const profileFields =
-  "id, name, phone, avatar_url, role, subscription_tier, created_at, updated_at"
+  "id, name, email, phone, avatar_url, role, subscription_tier, platform_permissions, created_at, updated_at"
 
 function handleError(error: { message: string } | null): void {
   if (error) throw new Error(error.message)
