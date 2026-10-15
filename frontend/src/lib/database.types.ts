@@ -59,6 +59,8 @@ export type PaymentStatus = "pending" | "paid" | "failed" | "refunded"
 
 export type MediaStatus = "pending" | "approved" | "rejected"
 
+export type ApplicationStatus = "pending" | "approved" | "rejected"
+
 /** Roles a public signup form is allowed to request. Admin roles are never self-service. */
 export type PublicSignupRole = Extract<UserRole, "customer" | "venue_owner">
 
@@ -259,6 +261,36 @@ export type VenueTeamInsert = {
 
 export type VenueTeamUpdate = Partial<Pick<VenueTeamInsert, "permissions">>
 
+export type VenueApplicationRow = {
+  id: string
+  applicant_name: string
+  email: string
+  phone: string
+  venue_name: string
+  venue_address: string
+  status: ApplicationStatus
+  admin_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type VenueApplicationInsert = {
+  id?: string
+  applicant_name: string
+  email: string
+  phone: string
+  venue_name: string
+  venue_address: string
+  status?: ApplicationStatus
+  admin_notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type VenueApplicationUpdate = Partial<
+  Pick<VenueApplicationInsert, "applicant_name" | "email" | "phone" | "venue_name" | "venue_address" | "status" | "admin_notes">
+>
+
 /** Exact return shape of `public.search_venues_nearby`. */
 export type NearbyVenueRow = {
   id: string
@@ -302,6 +334,7 @@ export type Database = {
       hold_logs: TableDefinition<HoldLogRow, HoldLogRow, Partial<HoldLogRow>>
       bookings: TableDefinition<BookingRow, BookingInsert, BookingUpdate>
       venue_team: TableDefinition<VenueTeamRow, VenueTeamInsert, VenueTeamUpdate>
+      venue_applications: TableDefinition<VenueApplicationRow, VenueApplicationInsert, VenueApplicationUpdate>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -327,6 +360,7 @@ export type Database = {
       booking_status: BookingStatus
       payment_status: PaymentStatus
       media_status: MediaStatus
+      application_status: ApplicationStatus
     }
     CompositeTypes: { [_ in never]: never }
   }

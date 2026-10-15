@@ -58,11 +58,11 @@ ON CONFLICT (id) DO NOTHING;
 -- --------------------------------------------------------
 -- 1. Profiles (Hardcoded UUIDs for relational mapping)
 -- --------------------------------------------------------
-INSERT INTO public.profiles (id, role, name, phone, avatar_url, created_at, updated_at)
+INSERT INTO public.profiles (id, role, name, email, phone, avatar_url, created_at, updated_at)
 VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'admin', 'Khel Admin', '+923000000001', null, now(), now()),
-  ('b0000000-0000-0000-0000-000000000002', 'venue_owner', 'Bahadurabad Sports Manager', '+923000000002', null, now(), now()),
-  ('c0000000-0000-0000-0000-000000000003', 'customer', 'Test Player', '+923000000003', null, now(), now())
+  ('a0000000-0000-0000-0000-000000000001', 'admin', 'Khel Admin', 'admin@khel.com', '+923000000001', null, now(), now()),
+  ('b0000000-0000-0000-0000-000000000002', 'venue_owner', 'Bahadurabad Sports Manager', 'owner@khel.com', '+923000000002', null, now(), now()),
+  ('c0000000-0000-0000-0000-000000000003', 'customer', 'Test Player', 'customer@khel.com', '+923000000003', null, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 -- --------------------------------------------------------
@@ -154,3 +154,28 @@ VALUES
   (gen_random_uuid(), 'c5000000-0000-0000-0000-000000000005', CURRENT_DATE,     '20:00:00', '21:00:00', 'available'),
   (gen_random_uuid(), 'c5000000-0000-0000-0000-000000000005', CURRENT_DATE,     '21:00:00', '22:00:00', 'available')
 ON CONFLICT DO NOTHING;
+
+-- --------------------------------------------------------
+-- 5. Mock Booking (For Safepay Webhook Testing)
+-- --------------------------------------------------------
+INSERT INTO public.bookings (
+  id, 
+  booking_ref, 
+  customer_id, 
+  venue_id, 
+  court_id, 
+  status, 
+  payment_status, 
+  total_charged, 
+  venue_payout_amount
+) VALUES (
+  'f1111111-1111-1111-1111-111111111111', 
+  'REF-TEST-001', 
+  'c0000000-0000-0000-0000-000000000003',
+  'd1000000-0000-0000-0000-000000000001',
+  'c1000000-0000-0000-0000-000000000001',
+  'confirmed', 
+  'pending', 
+  3000.00, 
+  2700.00
+) ON CONFLICT (id) DO NOTHING;
