@@ -222,9 +222,10 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          email: string | null
           id: string
           name: string
-          phone: string
+          phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           subscription_tier: string
           updated_at: string
@@ -232,9 +233,10 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           id: string
           name: string
-          phone: string
+          phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           subscription_tier?: string
           updated_at?: string
@@ -242,9 +244,10 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           name?: string
-          phone?: string
+          phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           subscription_tier?: string
           updated_at?: string
@@ -295,6 +298,48 @@ export type Database = {
             columns: ["held_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venue_team: {
+        Row: {
+          created_at: string | null
+          id: string
+          permissions: Json
+          updated_at: string | null
+          user_id: string
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          permissions?: Json
+          updated_at?: string | null
+          user_id: string
+          venue_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          permissions?: Json
+          updated_at?: string | null
+          user_id?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_team_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_team_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
@@ -376,6 +421,7 @@ export type Database = {
         }[]
       }
       is_admin: { Args: never; Returns: boolean }
+      release_expired_holds: { Args: never; Returns: undefined }
       search_venues_nearby: {
         Args: { p_lat: number; p_lon: number; p_radius_km: number }
         Returns: {

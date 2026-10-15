@@ -16,7 +16,7 @@ import { getAuthErrorMessage, normalizePhone } from "@/lib/utils"
 function getFormState(profile: ProfileRow) {
   return {
     name: profile.name,
-    phone: profile.phone.startsWith("pending-") ? "" : profile.phone,
+    phone: profile.phone && !profile.phone.startsWith("pending-") ? profile.phone : "",
     avatarUrl: profile.avatar_url ?? "",
   }
 }
@@ -65,7 +65,7 @@ export function ProfilePage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Your account</p><h1 className="mt-2 text-4xl font-black tracking-[-0.06em]">Profile</h1><p className="mt-2 text-muted-foreground">Keep your contact details current for smooth bookings and venue updates.</p>
-      {profile.phone.startsWith("pending-") ? <Notice tone="warning" title="Your phone number is incomplete" className="mt-6">Add a real mobile number before you book a court or list a venue.</Notice> : null}
+      {!profile.phone || profile.phone.startsWith("pending-") ? <Notice tone="warning" title="Your phone number is incomplete" className="mt-6">Add a real mobile number before you book a court or list a venue.</Notice> : null}
       <ProfileForm key={`${profile.id}:${profile.updated_at}`} profile={profile} />
     </main>
   )
