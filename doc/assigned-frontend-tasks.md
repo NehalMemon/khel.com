@@ -1,42 +1,21 @@
 # Assigned Frontend Tasks: Khel.com
 
-## Current Focus: Safepay Checkout Integration & Environment Setup
+> Completed and shipped sections were removed: 1. Environment & Client Setup,
+> 4. Booking Flow UI/UX, 5. Venue Owner Onboarding, 6. Venue Team Management,
+> and 7. Minimum Admin Panel; in this round, 8. Notification System UI was
+> completed and removed.
 
-### 1. Environment & Client Setup
-- [ ] Create `.env.local` in the `frontend` directory.
-- [ ] Add the local backend and payment keys:
-  - `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_local_anon_key>`
-  - `NEXT_PUBLIC_SAFEPAY_PUBLIC_KEY=<your_safepay_public_key>`
-- [ ] Initialize the Supabase client using the generated `frontend/src/types/database.types.ts` to ensure strict typing.
+## Remaining
 
-### 2. Safepay Widget Integration
+### 2. Safepay Widget Integration — BLOCKED (backend dependency)
 - [ ] Wire the frontend checkout button to launch the Safepay widget using the public key.
-- [ ] **CRITICAL:** Pass the active `booking_id` into the Safepay widget's `metadata` object during initialization. (Our Edge Function needs this metadata attached to the webhook to update the correct ledger entry).
+- [ ] **CRITICAL:** Pass the active `booking_id` into the Safepay widget's `metadata` object during initialization. (Our Edge Function needs this metadata attached to the webhook to update the correct ledger entry.)
 
+> **Blocker:** the Safepay browser SDK cannot attach `metadata` to a session, and a
+> session `tracker`/`tbt` must be created server-side. This needs a Supabase Edge
+> Function that creates the pending booking + Safepay session and returns the
+> tracker to the client before the widget can launch. See `doc/Design_Backend.md` §6.
 
-### 4. UI/UX Improvements: Booking Flow
-- [ ] **Clean URLs (State Management):** Refactor the booking page to manage the selected `courtId` and `date` using internal React State (e.g., `useState`, Context, or Zustand) instead of appending the long UUIDs to the URL query parameters. This will make the URLs much cleaner for users.
-- [ ] **Auto-Load Defaults:** Prevent the "empty screen" effect when a user first lands on the booking page. Automatically select the first available court by default and auto-load the slots for `today` so the user is immediately presented with clickable time slots.
-
-
-
-### 6. Venue Team Management (RAM)
-- [ ] **Team Dashboard (`/owner/team`):** Build a page in the Venue Owner dashboard to list all current team members and their assigned permissions by querying the `venue_team` table combined with the `profiles` table.
-- [ ] **Invite Team Member Modal:** Create a form that takes an `email` and a set of `permissions` (e.g., checkboxes for "View Bookings", "Edit Pricing"). For now, just build the UI; we will wire this up to a Supabase Edge Function later to handle the secure invitation and account creation process.
-
-
-### 5. Venue Owner Onboarding Flow
-- [ ] **Partner Landing Page (`/partner`):** Build a public-facing landing page explaining the benefits of listing a venue on Khel.com.
-- [ ] **Application Form (`/partner/apply`):** Create a form that collects `applicant_name`, `email`, `phone`, `venue_name`, and `venue_address`. On submit, insert this data directly into the `venue_applications` table. Show a success screen stating: "Your application is under review. Our team will contact you shortly."
-- [ ] **Admin Dashboard View (`/admin/applications`):** Build a protected admin route that fetches rows from `venue_applications` where `status === 'pending'`. Include UI buttons to "Approve" or "Reject" (API integration for approval will come later).
-
-### 7. Minimum Admin Panel (Approvals & RAM)
-- [ ] **Admin Layout (`/admin/layout.tsx`):** Create a secure layout that verifies `role === 'admin'` before rendering children.
-- [ ] **Applications Dashboard (`/admin/applications/page.tsx`):** Fetch rows from `venue_applications` where `status === 'pending'`. Render them in a data table.
-- [ ] **Approval Action:** Add "Approve" and "Reject" buttons to the table rows. (For MVP, clicking these should just update the `status` column in the database). Ensure these buttons are only visible if the admin has the `"manage_applications"` or `"all"` permission.
-
-### 8. Notification System UI
-- [ ] **Realtime Provider:** Create a `NotificationProvider` that listens to `INSERT` events on the `notifications` table where `user_id` matches the authenticated user.
-- [ ] **Header Bell Icon:** Add a notification bell to the main navbar showing an unread badge counter.
-- [ ] **Notification Dropdown:** Clicking the bell opens a popover listing the latest notifications. Clicking a notification marks it as `is_read: true` in Supabase and routes the user to the `action_link` if present.
+> **Backend note (notifications):** `notifications` table + RLS + `notification_type` enum exist (migration `20261015121301_admin_ram_and_notifications.sql`). Realtime
+> must be enabled for `public.notifications` (if not already) for the bell to update
+> on new inserts. Locally verify the table exists on your Supabase stack.

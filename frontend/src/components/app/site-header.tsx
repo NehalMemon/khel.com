@@ -7,6 +7,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Logo } from "@/components/app/logo"
+import { NotificationBell } from "@/components/app/notification-bell"
 
 const links = [
   { href: "/", label: "Discover" },
@@ -58,6 +59,7 @@ export function SiteHeader() {
                 <UserRound className="size-4" />
                 {profile?.name ?? "Profile"}
               </Link>
+              <NotificationBell />
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 <LogOut />
                 Sign out
@@ -74,15 +76,17 @@ export function SiteHeader() {
             </>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          aria-label={open ? "Close navigation" : "Open navigation"}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X /> : <Menu />}
-        </Button>
+        <div className="flex items-center gap-1 md:hidden">
+          <NotificationBell />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={open ? "Close navigation" : "Open navigation"}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? <X /> : <Menu />}
+          </Button>
+        </div>
       </div>
       {open ? (
         <div className="border-t bg-card px-4 py-3 md:hidden">

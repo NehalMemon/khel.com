@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { AuthProvider } from "@/components/auth/auth-provider"
 import { QueryProvider } from "@/components/app/query-provider"
+import { NotificationProvider } from "@/components/app/notification-provider"
 import { APP_NAME, APP_TAGLINE } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased" suppressHydrationWarning>
         <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <NotificationProvider>{children}</NotificationProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>
