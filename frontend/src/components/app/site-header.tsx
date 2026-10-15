@@ -48,7 +48,7 @@ export function SiteHeader() {
           {isAuthenticated ? (
             <>
               <Link
-                href="/partner"
+                href="/partner/overview"
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <LayoutDashboard className="size-4" />
@@ -99,7 +99,7 @@ export function SiteHeader() {
             ))}
             {isAuthenticated ? (
               <>
-                <Link href="/partner" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted">
+                <Link href="/partner/overview" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted">
                   <LayoutDashboard className="size-4" />
                   Partner portal
                 </Link>

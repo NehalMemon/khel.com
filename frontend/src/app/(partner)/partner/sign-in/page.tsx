@@ -17,15 +17,15 @@ export function getSafeNextPath(value: string | string[] | undefined): string {
     candidate.includes("\\") ||
     /[\u0000-\u001f]/.test(candidate)
   ) {
-    return "/partner"
+    return "/partner/overview"
   }
   try {
     const baseUrl = new URL("https://khel.local")
     const url = new URL(candidate, baseUrl)
-    if (url.origin !== baseUrl.origin || url.pathname.startsWith("//")) return "/partner"
+    if (url.origin !== baseUrl.origin || url.pathname.startsWith("//")) return "/partner/overview"
     return `${url.pathname}${url.search}${url.hash}`
   } catch {
-    return "/partner"
+    return "/partner/overview"
   }
 }
 

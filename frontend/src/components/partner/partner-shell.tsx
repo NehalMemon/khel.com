@@ -10,16 +10,18 @@ import {
   LogOut,
   MapPinned,
   UserRound,
+  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/auth-provider"
 import { cn } from "@/lib/utils"
 
 const navigation = [
-  { href: "/partner", label: "Overview", icon: LayoutDashboard },
+  { href: "/partner/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/partner/courts", label: "Courts", icon: BarChart3 },
   { href: "/partner/schedule", label: "Schedule", icon: CalendarDays },
   { href: "/partner/bookings", label: "Bookings", icon: ClipboardList },
+  { href: "/partner/team", label: "Team", icon: Users },
   { href: "/partner/profile", label: "Profile", icon: UserRound },
 ]
 
