@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 
 const navigation = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/applications", label: "Applications", icon: ClipboardList },
   { href: "/admin/venues/review", label: "Venue review", icon: BarChart3 },
   { href: "/admin/venues", label: "All venues", icon: Building2 },
   { href: "/admin/courts", label: "Courts", icon: Swords },

@@ -30,3 +30,13 @@
 - [ ] **Partner Landing Page (`/partner`):** Build a public-facing landing page explaining the benefits of listing a venue on Khel.com.
 - [ ] **Application Form (`/partner/apply`):** Create a form that collects `applicant_name`, `email`, `phone`, `venue_name`, and `venue_address`. On submit, insert this data directly into the `venue_applications` table. Show a success screen stating: "Your application is under review. Our team will contact you shortly."
 - [ ] **Admin Dashboard View (`/admin/applications`):** Build a protected admin route that fetches rows from `venue_applications` where `status === 'pending'`. Include UI buttons to "Approve" or "Reject" (API integration for approval will come later).
+
+### 7. Minimum Admin Panel (Approvals & RAM)
+- [ ] **Admin Layout (`/admin/layout.tsx`):** Create a secure layout that verifies `role === 'admin'` before rendering children.
+- [ ] **Applications Dashboard (`/admin/applications/page.tsx`):** Fetch rows from `venue_applications` where `status === 'pending'`. Render them in a data table.
+- [ ] **Approval Action:** Add "Approve" and "Reject" buttons to the table rows. (For MVP, clicking these should just update the `status` column in the database). Ensure these buttons are only visible if the admin has the `"manage_applications"` or `"all"` permission.
+
+### 8. Notification System UI
+- [ ] **Realtime Provider:** Create a `NotificationProvider` that listens to `INSERT` events on the `notifications` table where `user_id` matches the authenticated user.
+- [ ] **Header Bell Icon:** Add a notification bell to the main navbar showing an unread badge counter.
+- [ ] **Notification Dropdown:** Clicking the bell opens a popover listing the latest notifications. Clicking a notification marks it as `is_read: true` in Supabase and routes the user to the `action_link` if present.

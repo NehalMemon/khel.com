@@ -1,10 +1,12 @@
 import type {
+  ApplicationStatus,
   BookingRow,
   CourtRow,
   Database,
   ProfileRow,
   SubscriptionTier,
   UserRole,
+  VenueApplicationRow,
   VenueRow,
   VenueStatus,
 } from "@/lib/database.types"
@@ -19,7 +21,7 @@ const courtFields =
 const bookingFields =
   "id, booking_ref, customer_id, slot_id, court_id, venue_id, status, payment_status, payment_gateway_ref, total_charged, venue_payout_amount, commission_amount_snapshot, created_at, updated_at"
 const profileFields =
-  "id, name, phone, avatar_url, role, subscription_tier, created_at, updated_at"
+  "id, name, email, phone, avatar_url, role, subscription_tier, platform_permissions, created_at, updated_at"
 
 export type AdminVenue = VenueRow & { courts: CourtRow[] }
 
@@ -280,6 +282,44 @@ export async function updateAppConfig(
 
 export function formatAdminError(error: unknown): string {
   return getErrorMessage(error)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Venue Applications (Onboarding)                                            */
+/* -------------------------------------------------------------------------- */
+
+export async function fetchVenueApplications(
+  status?: ApplicationStatus,
+): Promise<VenueApplicationRow[]> {
+  if (!isSupabaseConfigured()) return []
+  let request = getSupabaseBrowserClient()
+    .from("venue_applications")
+    .select("*")
+  if (status) request = request.eq("status", status)
+  const { data, error } = await request.order("created_at", { ascending: false })
+  handleError(error)
+  return (data ?? []) as VenueApplicationRow[]
+}
+
+export async function updateVenueApplicationStatus(
+  id: string,
+  status: ApplicationStatus,
+  adminNotes?: string,
+): Promise<VenueApplicationRow> {
+  requireConfigured()
+  const payload: { status: ApplicationStatus; admin_notes?: string; updated_at: string } = {
+    status,
+    updated_at: new Date().toISOString(),
+  }
+  if (adminNotes !== undefined) payload.admin_notes = adminNotes
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("venue_applications")
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .single()
+  handleError(error)
+  return data as VenueApplicationRow
 }
 
 export type DatabaseSchema = Database

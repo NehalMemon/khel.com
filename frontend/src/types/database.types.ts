@@ -218,6 +218,47 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          action_link: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          action_link?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          action_link?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -226,6 +267,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          platform_permissions: Json | null
           role: Database["public"]["Enums"]["user_role"]
           subscription_tier: string
           updated_at: string
@@ -237,6 +279,7 @@ export type Database = {
           id: string
           name: string
           phone?: string | null
+          platform_permissions?: Json | null
           role?: Database["public"]["Enums"]["user_role"]
           subscription_tier?: string
           updated_at?: string
@@ -248,6 +291,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          platform_permissions?: Json | null
           role?: Database["public"]["Enums"]["user_role"]
           subscription_tier?: string
           updated_at?: string
@@ -484,6 +528,12 @@ export type Database = {
         | "cancelled_by_venue"
         | "no_show"
       media_status: "pending" | "approved" | "rejected"
+      notification_type:
+        | "booking_confirmed"
+        | "booking_cancelled"
+        | "application_approved"
+        | "application_rejected"
+        | "system_alert"
       payment_status: "pending" | "paid" | "failed" | "refunded"
       slot_status: "available" | "held" | "booked" | "blocked" | "maintenance"
       user_role:
@@ -640,6 +690,13 @@ export const Constants = {
         "no_show",
       ],
       media_status: ["pending", "approved", "rejected"],
+      notification_type: [
+        "booking_confirmed",
+        "booking_cancelled",
+        "application_approved",
+        "application_rejected",
+        "system_alert",
+      ],
       payment_status: ["pending", "paid", "failed", "refunded"],
       slot_status: ["available", "held", "booked", "blocked", "maintenance"],
       user_role: [
