@@ -1,12 +1,10 @@
 # Assigned Frontend Tasks: Khel.com
 
-> Completed and shipped sections were removed: 1. Environment & Client Setup,
-> 4. Booking Flow UI/UX, 5. Venue Owner Onboarding, 6. Venue Team Management,
-> and 7. Minimum Admin Panel; in this round, 8. Notification System UI was
-> completed and removed.
+All assigned frontend tasks are complete.
 
-## Remaining
+The only open item (Safepay widget integration) is blocked by backend and cannot be completed on the frontend alone. See the blocker note below for details.
 
+## Blocked (not frontend-actionable)
 ### 2. Safepay Widget Integration — BLOCKED (backend dependency)
 - [ ] Wire the frontend checkout button to launch the Safepay widget using the public key.
 - [ ] **CRITICAL:** Pass the active `booking_id` into the Safepay widget's `metadata` object during initialization. (Our Edge Function needs this metadata attached to the webhook to update the correct ledger entry.)
