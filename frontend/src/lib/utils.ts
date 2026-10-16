@@ -53,7 +53,7 @@ export function formatTime(value: string): string {
   const t = (value ?? "").trim()
   if (!t.includes(":")) return t
   const [hStr, mStr] = t.split(":")
-  let h = parseInt(hStr, 10)
+  const h = parseInt(hStr, 10)
   if (Number.isNaN(h)) return t
   const m = mStr ?? "00"
   const ampm = h >= 12 ? "PM" : "AM"
