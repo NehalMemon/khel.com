@@ -50,7 +50,17 @@ export function formatDateTime(value: string): string {
 }
 
 export function formatTime(value: string): string {
-  return value.slice(0, 5)
+  const t = (value ?? "").trim()
+  if (!t.includes(":")) return t
+  const [hStr, mStr] = t.split(":")
+  let h = parseInt(hStr, 10)
+  if (Number.isNaN(h)) return t
+  const m = mStr ?? "00"
+  const ampm = h >= 12 ? "PM" : "AM"
+  let hh = h % 12
+  if (hh === 0) hh = 12
+  const mm = m.padEnd(2, "0").slice(0, 2)
+  return `${hh}:${mm} ${ampm}`
 }
 
 /** Pakistan Standard Time. Slot times are stored as naive local times. */

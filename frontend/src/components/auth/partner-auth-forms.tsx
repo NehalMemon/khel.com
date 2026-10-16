@@ -18,7 +18,7 @@ import {
 } from "@/lib/utils"
 import { signIn, signUpVenueOwner } from "@/lib/auth"
 
-export function PartnerSignInForm({ nextPath = "/partner" }: { nextPath?: string }) {
+export function PartnerSignInForm({ nextPath = "/partner/overview" }: { nextPath?: string }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -116,7 +116,7 @@ export function PartnerSignUpForm() {
     try {
       const result = await mutation.mutateAsync()
       if (result.session) {
-        router.push("/partner")
+        router.push("/partner/overview")
         router.refresh()
       } else {
         setSubmitted(true)

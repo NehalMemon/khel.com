@@ -3,9 +3,7 @@
 import { useMemo, useState } from "react"
 import {
   Check,
-  ClipboardList,
   Clock,
-  Filter,
   Lock,
   Mail,
   MapPin,
@@ -50,13 +48,12 @@ export function ApplicationsPage() {
   const updateMutation = useUpdateVenueApplicationStatusMutation()
 
   // Admin RAM verification: requires "manage_applications" or "all"
-  const canManageApplications = useMemo(() => {
-    if (!profile?.platform_permissions) return false
-    const perms = Array.isArray(profile.platform_permissions)
-      ? (profile.platform_permissions as string[])
-      : []
-    return perms.includes("all") || perms.includes("manage_applications")
-  }, [profile?.platform_permissions])
+  // (Computed inline so the React Compiler doesn't flag manual memoization.)
+  const platformPermissions = Array.isArray(profile?.platform_permissions)
+    ? (profile.platform_permissions as string[])
+    : []
+  const canManageApplications =
+    platformPermissions.includes("all") || platformPermissions.includes("manage_applications")
 
   const filteredApplications = useMemo(() => {
     const rows = applicationsQuery.data ?? []

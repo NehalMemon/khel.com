@@ -4,9 +4,11 @@ import type {
   CourtInsert,
   CourtRow,
   CourtUpdate,
+  Json,
   SlotInsert,
   SlotRow,
   SlotStatus,
+  UserRole,
   VenueInsert,
   VenueRow,
   VenueUpdate,
@@ -286,6 +288,62 @@ export function markBookingCompleted(bookingId: string): Promise<PartnerBookingR
 
 export function cancelBookingByVenue(bookingId: string): Promise<PartnerBookingRow> {
   return setBookingStatus(bookingId, "cancelled_by_venue")
+}
+
+/* -------------------------------------------------------------------------- */
+/* Venue team                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export type TeamMemberProfile = {
+  id: string
+  name: string | null
+  email: string | null
+  avatar_url: string | null
+  role: UserRole
+}
+
+export type OwnedTeamMember = {
+  id: string
+  venue_id: string
+  venue_name: string
+  user_id: string
+  permissions: Json
+  created_at: string | null
+  member: TeamMemberProfile | null
+}
+
+/**
+ * Team members across the owner's venues, joined to `profiles` for name/email.
+ * Read-only: adding/removing members is intentionally deferred to a backend Edge
+ * Function so invitation + account creation stay server-side (see task list).
+ */
+export async function fetchOwnedTeamMembers(ownerId: string): Promise<OwnedTeamMember[]> {
+  const venues = await fetchOwnedVenues(ownerId)
+  if (!isSupabaseConfigured() || venues.length === 0) return []
+  const venueNames = new Map(venues.map((venue) => [venue.id, venue.name]))
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("venue_team")
+    .select(
+      "id, venue_id, user_id, permissions, created_at, member:profiles ( id, name, email, avatar_url, role )",
+    )
+    .in(
+      "venue_id",
+      venues.map((venue) => venue.id),
+    )
+    .order("created_at", { ascending: true })
+  handleError(error)
+  type RawTeamRow = {
+    id: string
+    venue_id: string
+    user_id: string
+    permissions: Json
+    created_at: string | null
+    member: TeamMemberProfile | null
+  }
+  return ((data ?? []) as RawTeamRow[]).map((row) => ({
+    ...row,
+    venue_name: venueNames.get(row.venue_id) ?? "Venue",
+  }))
 }
 
 /* -------------------------------------------------------------------------- */

@@ -8,7 +8,9 @@ import type { Database } from "@/types/database.types"
  * `doc/FRONTEND_STRATEGY.md`:
  *
  *  - `/(customer)` — public marketplace; `/bookings` and `/profile` need a session.
- *  - `/(partner)`  — `/partner/**` requires `role = venue_owner`.
+ *  - `/(partner)`  — public onboarding (`/partner`, `/partner/apply`,
+ *    `/partner/join`, `/partner/sign-in`); the rest of `/partner/**` requires
+ *    `role = venue_owner`.
  *  - `/(admin)`    — `/admin/**` requires `role in ('admin', 'super_admin')`.
  *
  * RLS in the database remains the real authorization boundary; this is a UX
@@ -17,6 +19,8 @@ import type { Database } from "@/types/database.types"
 const CUSTOMER_SIGN_IN = "/auth/sign-in"
 const PARTNER_SIGN_IN = "/partner/sign-in"
 const PARTNER_JOIN = "/partner/join"
+const PARTNER_LANDING = "/partner"
+const PARTNER_APPLY = "/partner/apply"
 const ADMIN_SIGN_IN = "/admin/sign-in"
 
 function copyCookies(source: NextResponse, target: NextResponse): NextResponse {
@@ -46,9 +50,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const needsPartnerGuard =
     pathname.startsWith("/partner") &&
+    pathname !== PARTNER_LANDING &&
     pathname !== PARTNER_JOIN &&
     pathname !== PARTNER_SIGN_IN &&
-    !pathname.startsWith(`${PARTNER_SIGN_IN}/`)
+    pathname !== PARTNER_APPLY &&
+    !pathname.startsWith(`${PARTNER_SIGN_IN}/`) &&
+    !pathname.startsWith(`${PARTNER_APPLY}/`)
   const needsAdminGuard =
     pathname.startsWith("/admin") &&
     pathname !== ADMIN_SIGN_IN &&

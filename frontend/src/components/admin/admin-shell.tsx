@@ -17,6 +17,7 @@ const navigation = [
   { href: "/admin/venues", label: "All venues", icon: Building2 },
   { href: "/admin/courts", label: "Courts", icon: Swords },
   { href: "/admin/partners", label: "Venue owners", icon: Store },
+  { href: "/admin/applications", label: "Applications", icon: ClipboardList },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarRange },
   { href: "/admin/config", label: "Platform config", icon: Settings2 },

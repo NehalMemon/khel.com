@@ -90,3 +90,46 @@ Already shipped (per the Backend→Frontend Handoff doc, `staging` branch): migr
    invoke it manually with a crafted `{ "event": "payment.succeeded", "tracker": "...",
    "metadata": { "booking_id": "..." } }` body. Worth documenting the chosen approach
    alongside the webhook contract.
+
+## 7. Venue Onboarding + Team — Advisory Notes From Frontend (2026-10-15)
+
+> From the frontend-only `abid-dev` branch while building the new tasks 5 & 6
+> (`doc/assigned-frontend-tasks.md`). Nothing under `supabase/` was touched; these
+> are requests/decisions for the backend owner.
+
+1. **Admin approve/reject action for `venue_applications` — needs a decision.**
+   The new `/admin/applications` page lists `status = 'pending'` rows with
+   Approve/Reject buttons that are intentionally **disabled** (the task said
+   "API integration for approval will come later"). The DB already permits admin
+   updates (`CREATE POLICY "Admins can update applications"` in
+   `20261015114427_create_venue_applications.sql`), so the frontend *could* write
+   `status` directly. Open question: should approval stay a plain status update,
+   or is there a planned RPC/Edge Function that also creates the `venues` row and
+   provisions the owner account in one server-side step? If the latter, frontend
+   needs its contract.
+
+2. **`venue_applications` RLS only grants `admin`, not `super_admin`.**
+   Both policies (`SELECT`/`UPDATE`) check `profiles.role = 'admin'`. The frontend
+   treats `admin` and `super_admin` as equivalent (`isAdminRole`, and the
+   `proxy.ts` admin guard accepts both), so a `super_admin` session passes the
+   route guard but would be blocked by RLS on this table and see an empty list.
+   Worth widening the policy to match, or frontend will need to special-case it.
+
+3. **Invite-team-member needs a server-side Edge Function.**
+   The `/partner/team` invite modal (email + permission checkboxes) is **UI-only**.
+   Wiring it requires a secure server step that creates/invites the account and
+   inserts the `venue_team` row (and, per §5 item 5, `venue_team` still has no RLS
+   policy). Frontend will not put any secret or privileged key in the browser.
+
+4. **Generated types were committed as UTF-16LE.**
+   `frontend/src/types/database.types.ts` arrived from staging (`742546d`) as
+   **UTF-16LE** (a PowerShell `>` redirect), which made eslint fail with
+   `Parsing error: File appears to be binary`. Frontend normalized it to UTF-8/LF.
+   Whoever regenerates types should emit UTF-8 (that file is read by the app build
+   **and** the linter), or lint will break again on the next regen.
+
+5. **Duplicate types file at the repo root.**
+   Staging also added `src/types/database.types.ts` at the **repository root**
+   (outside `frontend/`), in addition to the app's real copy. It is committed and
+   currently unreferenced by the app. Left in place for the backend owner to decide
+   — it looks like stray duplication (related to §5 item 11 about `web/src/...`).

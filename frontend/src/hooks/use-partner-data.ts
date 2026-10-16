@@ -13,6 +13,7 @@ import {
   createSlots,
   createVenue,
   fetchOwnedBookings,
+  fetchOwnedTeamMembers,
   fetchOwnedVenues,
   fetchOwnerSlots,
   markBookingCompleted,
@@ -42,6 +43,14 @@ export function usePartnerBookings(ownerId: string | null) {
   return useQuery({
     queryKey: ["partner", "bookings", ownerId],
     queryFn: () => fetchOwnedBookings(ownerId as string),
+    enabled: Boolean(ownerId),
+  })
+}
+
+export function usePartnerTeam(ownerId: string | null) {
+  return useQuery({
+    queryKey: ["partner", "team", ownerId],
+    queryFn: () => fetchOwnedTeamMembers(ownerId as string),
     enabled: Boolean(ownerId),
   })
 }
