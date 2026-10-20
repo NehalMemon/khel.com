@@ -24,12 +24,13 @@ dependencies, listed under "Blocked (not frontend-actionable)".
 - [x] **Date Selector:** Place a prominent, horizontally scrollable date-picker at the top of the venue page (defaulting to Today). Limit advance days based on `venue.max_advance_booking_days`.
 - [x] **Category Grouping:** Group the UI by `resource.category` (e.g., "PlayStation 5", "VIP Rooms", "Futsal Pitches"). Do NOT list "PC 1", "PC 2", etc.
 - [x] **Dynamic Time Chips:** Under each category, render horizontal time chips (e.g., `[ 6:00 PM ]`).
-  - *Auto-Assignment Logic:* If a venue has 5 PCs, the "PC" category time chip at 8:00 PM remains clickable as long as `< 5` PCs are booked. The customer never selects the specific PC number.
-  - *Selection:* Clicking a time chip opens a side-drawer or modal to finalize the duration and proceed to Safepay.
+  - [x] *Auto-Assignment Logic:* If a venue has 5 PCs, the "PC" category time chip at 8:00 PM remains clickable as long as `< 5` PCs are booked. The customer never selects the specific PC number.
+  - [x] *Selection:* Clicking a time chip opens a side-drawer or modal to finalize the duration and proceed to Safepay.
 
 > Implemented in `frontend/src/components/booking/venue-detail-page.tsx` (scrollable date
-> strip capped by `max_advance_booking_days`, category-grouped cards, aggregated time
-> chips, Sheet drawer → hold → `HoldCountdown` + `SafepayCheckoutButton`).
+> strip capped by `max_advance_booking_days`, default 14; category-grouped cards with
+> aggregated time chips showing `n/m free`; Sheet drawer → hold → `HoldCountdown` +
+> `SafepayCheckoutButton`).
 
 ## 2. Owner UI: The Virtual Venue Designer (Configuration) — DONE
 **Goal:** Owners need a visual way to build their inventory without filling out spreadsheets or typing JSON.
@@ -39,20 +40,22 @@ dependencies, listed under "Blocked (not frontend-actionable)".
 
 > Implemented in `frontend/src/components/partner/partner-resources-page.tsx` +
 > `resource-designer.tsx` (two-level tree, Add Asset / Add Room-Zone, nest-inside,
-> Pro-gated `metadata.capacity` / `metadata.booking_model`, cascading delete confirm).
+> Pro-gated `metadata.capacity` / `metadata.booking_model` with a locked overlay and a
+> "Pro tools locked" badge, cascading delete confirm).
 > Route: `frontend/src/app/(partner)/partner/(portal)/resources/page.tsx`.
 
 ## 3. Owner UI: Live Timeline POS (Walk-in Management) — DONE
 **Goal:** GameZone owners manage rapid walk-in traffic and need a bird's-eye view of their venue.
 - [x] **Gantt Chart View (`/partner/dashboard`):** Build a 2D timeline grid.
-  - *Y-Axis:* List all resources hierarchically (Rooms, with dropdown toggles to show child PCs inside them).
-  - *X-Axis:* Time of day, with a red vertical line indicating `now()`.
+  - [x] *Y-Axis:* List all resources hierarchically (Rooms, with dropdown toggles to show child PCs inside them).
+  - [x] *X-Axis:* Time of day, with a red vertical line indicating `now()`.
 - [x] **Instant Block Action:** Clicking any empty cell on this grid opens a rapid "Walk-in Block" modal, allowing the owner to instantly generate a booking record (blocking the time) without going through the Safepay flow.
 
 > Implemented in `frontend/src/components/partner/partner-timeline-page.tsx` +
-> `venue-timeline.tsx` (hour columns 6:00–24:00, hierarchical Y rows with collapsible
-> child assets, booking blocks, per-row red now-line refreshed every 60s, click-empty-cell
-> walk-in Sheet → `useCreateWalkInBookingMutation`). Route:
+> `venue-timeline.tsx` (hour columns 6:00–24:00, hierarchical Y rows where containers
+> expand to their nested assets, booking blocks positioned by start/end, per-row red
+> now-line refreshed every 60s, click-empty-cell walk-in Sheet →
+> `useCreateWalkInBookingMutation`). Route:
 > `frontend/src/app/(partner)/partner/(portal)/dashboard/page.tsx`.
 
 ## 4. Edge Function Integrations — DONE
@@ -64,26 +67,32 @@ dependencies, listed under "Blocked (not frontend-actionable)".
 
 > Implemented in `frontend/src/lib/queries/checkout.ts` +
 > `frontend/src/components/booking/safepay-checkout-button.tsx` (widget),
+> `frontend/src/lib/queries/admin.ts` → `use-admin-data.ts` →
 > `frontend/src/components/admin/applications-page.tsx` (approve),
+> `frontend/src/lib/queries/partner.ts` → `use-partner-data.ts` →
 > `frontend/src/components/partner/team-dashboard.tsx` (invite), and
 > `frontend/src/components/app/notification-provider.tsx` (channel `notifications:<userId>`,
 > `INSERT` filtered by `user_id`).
 
 ## 5. Routing & Access Control — DONE
 - [x] **Smart Redirects:** Route post-login traffic based on `profiles.role` (`admin` -> `/admin`, `venue_owner` -> `/partner`, `customer` -> `/`). Implement layout security guards in Next.js to block unauthorized URL access.
-- [x] **Layout Security Guards:** Admin guard via `(admin)/admin/(console)/layout.tsx` (keeps `/admin/sign-in` reachable) and partner guard in `(partner)/partner/(portal)/layout.tsx`.
+- [x] **Layout Security Guards:** Admin guard via `(admin)/admin/(console)/layout.tsx` (keeps `/admin/sign-in` reachable as a sibling) and partner guard in `(partner)/partner/(portal)/layout.tsx`.
 - [x] **Dynamic Navigation:** Update the main Navbar to conditionally render role-specific quick links ("Admin Panel", "Owner Dashboard", or "My Bookings").
 
 > Implemented in `frontend/src/lib/auth-server.ts` (`getServerViewer`, `isAdminRole`,
 > `isPartnerRole`), the two layouts above, `frontend/src/lib/auth.ts`
-> (`homePathForRole()`), and `frontend/src/components/app/site-header.tsx`.
+> (`homePathForRole()`), and `frontend/src/components/app/site-header.tsx`
+> (`workspaceLink(role)`).
 
 ## 6. UI/UX Improvements: Booking Flow — DONE
 - [x] **Clean URLs (State Management):** Refactor the booking page to manage the selected `courtId`/`resourceId` and `date` using internal React State (Context) instead of appending long UUIDs to URL query parameters.
 - [x] **Auto-Load Defaults:** Automatically select the first available resource by default and auto-load slots for `today` to prevent the "empty screen" effect on initial load.
 
 > Implemented in `frontend/src/components/booking/booking-selection-provider.tsx`
-> (holds `courtId`/`date`/`slotId` in context; booking page has no `searchParams`).
+> (holds `courtId`/`date`/`slotId` in context; the `/venues/[slug]/book` route declares no
+> `searchParams`) and `frontend/src/components/booking/booking-flow.tsx` (date defaults to
+> today, court falls back to the first court with a free slot, saved storefront showtime is
+> re-selected).
 
 ---
 
