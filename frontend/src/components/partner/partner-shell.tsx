@@ -4,11 +4,13 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   BarChart3,
+  Boxes,
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
   LogOut,
   MapPinned,
+  MonitorPlay,
   UserRound,
   Users,
 } from "lucide-react"
@@ -18,6 +20,8 @@ import { cn } from "@/lib/utils"
 
 const navigation = [
   { href: "/partner/overview", label: "Overview", icon: LayoutDashboard },
+  { href: "/partner/dashboard", label: "Timeline POS", icon: MonitorPlay },
+  { href: "/partner/resources", label: "Resources", icon: Boxes },
   { href: "/partner/courts", label: "Courts", icon: BarChart3 },
   { href: "/partner/schedule", label: "Schedule", icon: CalendarDays },
   { href: "/partner/bookings", label: "Bookings", icon: ClipboardList },

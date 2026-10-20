@@ -43,15 +43,15 @@ export function BookingFlow({ slug }: { slug: string }) {
   const { isAuthenticated, profile, isLoading: authLoading } = useAuth()
   const { selection, setSelection } = useBookingSelection()
 
-  const [selectedSlot, setSelectedSlot] = useState<PublicSlotRow | null>(null)
+  const [pickedSlot, setPickedSlot] = useState<PublicSlotRow | null>(null)
   // `hold_slot` only returns `slot_id` and the backend-issued `held_until`, so the
-  // user's chosen slot stays in `selectedSlot` for display.
+  // user's chosen slot stays in `pickedSlot` for display.
   const [hold, setHold] = useState<HoldSlotResult | null>(null)
   const [holdExpired, setHoldExpired] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paywallOpen, setPaywallOpen] = useState(false)
 
-  const courts = useMemo(() => venueQuery.data?.courts ?? [], [venueQuery.data])
+  const courts = useMemo(() => venueQuery.data?.resources ?? [], [venueQuery.data])
   const courtIds = useMemo(() => courts.map((court) => court.id), [courts])
 
   // The chosen court and date live in context (not the URL). Default the date to
@@ -59,6 +59,9 @@ export function BookingFlow({ slug }: { slug: string }) {
   const today = useMemo(() => getDateInputValue(), [])
   const date = selection?.slug === slug ? selection.date : today
   const savedCourtId = selection?.slug === slug ? selection.courtId : ""
+  // A showtime the storefront drawer already picked (set when the customer had
+  // to sign in mid-flow) is re-selected as soon as availability loads.
+  const savedSlotId = selection?.slug === slug ? selection.slotId : undefined
 
   // ONE query for every court's slots on the chosen date — never one per court.
   const slotsQuery = useAvailableSlotsForCourts(courtIds, date)
@@ -91,20 +94,30 @@ export function BookingFlow({ slug }: { slug: string }) {
     if (selection?.slug === slug && selection.courtId === activeCourtId && selection.date === date) {
       return
     }
-    setSelection({ slug, courtId: activeCourtId, date })
+    setSelection({ slug, courtId: activeCourtId, date, slotId: selection?.slotId })
   }, [courts.length, slug, selection, activeCourtId, date, setSelection])
 
   const holdMutation = useHoldSlotMutation()
   const selectedCourt = courts.find((court) => court.id === activeCourtId)
   const hasBookingContext = Boolean(activeCourtId && date)
-  // A hold is only "live" until its countdown runs out; once expired the inputs
-  // reopen so the customer can pick another time.
-  const hasHold = Boolean(hold && selectedSlot && !holdExpired)
 
   const availableSlots = useMemo(
     () => (activeCourtId ? availableByCourt.get(activeCourtId) ?? [] : []),
     [activeCourtId, availableByCourt],
   )
+
+  // Re-select the storefront drawer's showtime once availability has loaded.
+  // Derived rather than stored so there is no state-sync effect to run: the
+  // saved id only "resolves" when the matching slot is actually available.
+  const savedSlot = useMemo(
+    () => (savedSlotId ? availableSlots.find((slot) => slot.id === savedSlotId) ?? null : null),
+    [savedSlotId, availableSlots],
+  )
+  const selectedSlot = pickedSlot ?? savedSlot
+
+  // A hold is only "live" until its countdown runs out; once expired the inputs
+  // reopen so the customer can pick another time.
+  const hasHold = Boolean(hold && selectedSlot && !holdExpired)
 
   const expireHold = useCallback(() => {
     // Keep the expired hold visible (and the pay button disabled) instead of
@@ -115,7 +128,7 @@ export function BookingFlow({ slug }: { slug: string }) {
 
   function clearHold() {
     setHold(null)
-    setSelectedSlot(null)
+    setPickedSlot(null)
     setHoldExpired(false)
   }
 
@@ -128,7 +141,6 @@ export function BookingFlow({ slug }: { slug: string }) {
     clearHold()
     setSelection({ slug, courtId: activeCourtId, date: nextDate })
   }
-
   if (venueQuery.isPending) return <LoadingState label="Loading booking options" />
   if (venueQuery.isError) return <Notice tone="error" title="Could not load booking options">{venueQuery.error.message}</Notice>
   if (!venueQuery.data) return <Notice tone="error" title="Venue not found">This venue is no longer available for booking.</Notice>
@@ -206,7 +218,7 @@ export function BookingFlow({ slug }: { slug: string }) {
                     <span className="font-semibold">{court.name}</span>
                     <ChevronRight className={`size-4 ${activeCourtId === court.id ? "text-primary" : "text-muted-foreground"}`} />
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{court.sport_type ?? "Indoor sport"} · {formatCurrency(court.hourly_rate)}/hr</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{court.category ?? "Indoor sport"} · {formatCurrency(court.hourly_rate)}/hr</p>
                 </button>
               ))}
             </CardContent>
@@ -255,7 +267,7 @@ export function BookingFlow({ slug }: { slug: string }) {
                       type="button"
                       disabled={hasHold || holdMutation.isPending}
                       onClick={() => {
-                        setSelectedSlot(slot)
+                        setPickedSlot(slot)
                         setHold(null)
                         setHoldExpired(false)
                       }}

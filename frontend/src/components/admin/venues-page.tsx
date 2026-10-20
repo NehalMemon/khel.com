@@ -32,7 +32,7 @@ const ALL_STATUSES: VenueStatus[] = [
 
 function sportSummary(sports: string[]): string {
   const unique = [...new Set(sports.filter(Boolean))]
-  return unique.length === 0 ? "No courts" : unique.join(", ")
+  return unique.length === 0 ? "No resources" : unique.join(", ")
 }
 
 function hourlyRange(rates: number[]): string {
@@ -76,8 +76,8 @@ export function VenuesPage() {
         </p>
         <h1 className="mt-2 text-4xl font-black tracking-[-0.06em]">All venues</h1>
         <p className="mt-2 text-muted-foreground">
-          Every venue the platform can see, with its courts. Sports come from
-          `courts.sport_type` because there is no sports table.
+          Every venue the platform can see, with its bookable resources. Sports come from
+          `resources.category` because there is no sports table.
         </p>
       </div>
 
@@ -133,7 +133,7 @@ export function VenuesPage() {
                   <TableHead>Venue</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Sports</TableHead>
-                  <TableHead>Courts</TableHead>
+                  <TableHead>Resources</TableHead>
                   <TableHead>Hourly rate</TableHead>
                   <TableHead>Photos</TableHead>
                   <TableHead>Updated</TableHead>
@@ -153,11 +153,11 @@ export function VenuesPage() {
                       <StatusBadge status={venue.status} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {sportSummary(venue.courts.map((court) => court.sport_type ?? ""))}
+                      {sportSummary(venue.resources.map((resource) => resource.category ?? ""))}
                     </TableCell>
-                    <TableCell>{venue.courts.length}</TableCell>
+                    <TableCell>{venue.resources.length}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {hourlyRange(venue.courts.map((court) => Number(court.hourly_rate)))}
+                      {hourlyRange(venue.resources.map((resource) => Number(resource.hourly_rate)))}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {readVenueImages(venue.amenities).length}

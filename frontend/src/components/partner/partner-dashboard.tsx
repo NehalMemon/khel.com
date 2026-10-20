@@ -44,7 +44,7 @@ export function PartnerDashboard() {
   const [managedVenueId, setManagedVenueId] = useState("")
 
   const venues = venuesQuery.data ?? []
-  const courts = venues.flatMap((venue) => venue.courts)
+  const courts = venues.flatMap((venue) => venue.resources)
   const bookings = bookingsQuery.data ?? []
   const confirmedBookings = bookings.filter((booking) => booking.status === "confirmed")
   const paidBookings = bookings.filter((booking) => booking.payment_status === "paid")
@@ -80,9 +80,9 @@ export function PartnerDashboard() {
           <p className="mt-2 text-muted-foreground">Here is the pulse of your venues today.</p>
         </div>
         <Button asChild>
-          <Link href="/partner/courts">
+          <Link href="/partner/resources">
             <Plus />
-            Add a court
+            Add a resource
           </Link>
         </Button>
       </div>
@@ -114,7 +114,7 @@ export function PartnerDashboard() {
           icon={<Building2 className="size-4" />}
         />
         <MetricCard
-          label="Courts"
+          label="Resources"
           value={String(courts.length)}
           detail="Ready for scheduling"
           icon={<Users className="size-4" />}
@@ -149,11 +149,11 @@ export function PartnerDashboard() {
       {!venuesQuery.isPending && venues.length === 0 ? (
         <EmptyState
           title="Bring your first venue to life"
-          description="Create a venue draft, add your courts, then submit it for review when it is ready."
+          description="Create a venue draft, add your resources, then submit it for review when it is ready."
           action={
             <Button asChild>
-              <Link href="/partner/courts">
-                Start with your courts <ArrowRight />
+              <Link href="/partner/resources">
+                Start with your resources <ArrowRight />
               </Link>
             </Button>
           }
@@ -171,8 +171,8 @@ export function PartnerDashboard() {
                 </p>
               </div>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/partner/courts">
-                  Manage courts <ArrowRight />
+                <Link href="/partner/resources">
+                  Manage resources <ArrowRight />
                 </Link>
               </Button>
             </div>
@@ -194,7 +194,7 @@ export function PartnerDashboard() {
                       <StatusBadge status={venue.status} />
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {venue.address} · {venue.courts.length} courts
+                      {venue.address} · {venue.resources.length} resources
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export function PartnerDashboard() {
                         variant="secondary"
                         disabled={
                           submitMutation.isPending ||
-                          venue.courts.length === 0 ||
+                          venue.resources.length === 0 ||
                           phonePending
                         }
                         onClick={() => submitForReview(venue.id)}

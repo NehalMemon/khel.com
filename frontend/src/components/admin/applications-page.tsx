@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import {
   Check,
   Clock,
+  Loader2,
   Lock,
   Mail,
   MapPin,
@@ -29,6 +30,7 @@ import { EmptyState, LoadingState } from "@/components/app/loading-state"
 import { Notice } from "@/components/app/notice"
 import { useAuth } from "@/components/auth/auth-provider"
 import {
+  useApproveVenueApplicationMutation,
   useUpdateVenueApplicationStatusMutation,
   useVenueApplications,
 } from "@/hooks/use-admin-data"
@@ -40,12 +42,18 @@ export function ApplicationsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | ApplicationStatus>("pending")
   const [search, setSearch] = useState("")
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [processingId, setProcessingId] = useState<string | null>(null)
 
   const applicationsQuery = useVenueApplications(
     statusFilter === "all" ? undefined : statusFilter,
   )
   const updateMutation = useUpdateVenueApplicationStatusMutation()
+  // Approval is orchestrated server-side: the `approve-venue` Edge Function
+  // sends the invite, provisions the venue owner account, and flips the
+  // application status. Rejection has nothing to orchestrate, so it stays on
+  // the direct status mutation below.
+  const approveMutation = useApproveVenueApplicationMutation()
 
   // Admin RAM verification: requires "manage_applications" or "all"
   // (Computed inline so the React Compiler doesn't flag manual memoization.)
@@ -74,6 +82,7 @@ export function ApplicationsPage() {
   async function handleUpdateStatus(id: string, newStatus: ApplicationStatus) {
     if (!canManageApplications) return
     setActionError(null)
+    setActionSuccess(null)
     setProcessingId(id)
     try {
       await updateMutation.mutateAsync({
@@ -81,6 +90,27 @@ export function ApplicationsPage() {
         status: newStatus,
         adminNotes: `Updated to ${newStatus} by ${profile?.name || "admin"}`,
       })
+      setActionSuccess(`Application ${newStatus}.`)
+    } catch (err) {
+      setActionError(getErrorMessage(err))
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  /**
+   * Approve goes through the `approve-venue` Edge Function, which owns the
+   * whole orchestration (invite email → venue owner account → venue + status
+   * flip) and reports back its message for the success notice.
+   */
+  async function handleApprove(id: string) {
+    if (!canManageApplications) return
+    setActionError(null)
+    setActionSuccess(null)
+    setProcessingId(id)
+    try {
+      const result = await approveMutation.mutateAsync(id)
+      setActionSuccess(result.message ?? "Application approved.")
     } catch (err) {
       setActionError(getErrorMessage(err))
     } finally {
@@ -148,6 +178,11 @@ export function ApplicationsPage() {
       {actionError ? (
         <Notice tone="error" title="Action failed">
           {actionError}
+        </Notice>
+      ) : null}
+      {actionSuccess ? (
+        <Notice tone="success" title="Done">
+          {actionSuccess}
         </Notice>
       ) : null}
 
@@ -307,9 +342,13 @@ export function ApplicationsPage() {
                                   size="sm"
                                   className="h-8 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600"
                                   disabled={isProcessing}
-                                  onClick={() => handleUpdateStatus(app.id, "approved")}
+                                  onClick={() => handleApprove(app.id)}
                                 >
-                                  <Check className="mr-1 size-3.5" />
+                                  {isProcessing ? (
+                                    <Loader2 className="mr-1 size-3.5 animate-spin" />
+                                  ) : (
+                                    <Check className="mr-1 size-3.5" />
+                                  )}
                                   Approve
                                 </Button>
                               </div>

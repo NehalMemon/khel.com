@@ -1,52 +1,75 @@
-/**
- * Checkout seam.
- *
- * The Safepay checkout cannot be started from the browser alone. The official
- * SDK (`@sfpy/checkout-components`, v1.0.1) launches its `Checkout` zoid
- * component with **server-created session tokens** (`tracker` and `tbt`), and
- * its only working examples pass a merchant **secret** key (`sec_...`) from the
- * client. Neither is safe to ship in the frontend, and the SDK exposes no
- * `metadata` prop — so the `booking_id` the webhook depends on has to be
- * attached when the session is created server-side.
- *
- * `createPendingBooking` is the single seam the frontend depends on. Nehal must
- * implement it as an Edge Function (or RPC) that, in one server-side step:
- *   1. inserts a `pending` booking for `slotId` (the server computes the amount;
- *      the browser must never decide price, commission or availability),
- *   2. creates the Safepay payment session with `metadata.booking_id = <id>`,
- *   3. returns `{ bookingId, bookingRef, amount }` (and, once the widget is
- *      wired, the session tokens `{ tracker, tbt }`).
- *
- * Until that ships, every call throws `PaymentBackendNotReadyError` and the UI
- * keeps showing the "payment connection pending" state.
- */
+import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-browser"
 
-/** Raised while the payment backend has not been implemented yet. */
-export class PaymentBackendNotReadyError extends Error {
-  constructor(message = "The payment backend is not ready yet.") {
-    super(message)
-    this.name = "PaymentBackendNotReadyError"
-  }
-}
+/**
+ * Checkout orchestration seam.
+ *
+ * The browser never creates a booking, a price, or a Safepay session on its
+ * own. `initiate-checkout` (Supabase Edge Function) does all of it in one
+ * server-side step:
+ *
+ *   1. verifies the held slot and computes the amount + commission,
+ *   2. inserts (or reuses) the pending `bookings` row,
+ *   3. creates the Safepay tracker with `metadata.booking_id` attached so the
+ *      webhook can identify the transaction, and
+ *   4. returns `{ booking_id, booking_ref, amount, tracker, tbt }`.
+ *
+ * The client's only jobs are to pass the returned `tracker`/`tbt` to the
+ * Safepay widget (`@sfpy/checkout-components`) and to watch
+ * `bookings.payment_status` on the confirmation page — the gateway webhook is
+ * the only writer that finalizes the ledger.
+ */
 
 export type PendingBooking = {
   bookingId: string
   bookingRef: string
+  /** PKR, computed server-side. Display only; never trusted for charging. */
   amount: number
+  /** Safepay tracker token; feed this to the widget's `Checkout` component. */
+  tracker: string
+  /** Safepay passport time-based token; required by the widget alongside it. */
+  tbt: string
+}
+
+type InitiateCheckoutResponse = {
+  success?: boolean
+  booking_id?: string
+  booking_ref?: string
+  amount?: number
+  tracker?: string
+  tbt?: string
+  error?: string
+}
+
+export class CheckoutNotConfiguredError extends Error {
+  constructor(message = "Supabase is not connected, so checkout cannot start.") {
+    super(message)
+    this.name = "CheckoutNotConfiguredError"
+  }
 }
 
 /**
- * Creates a pending booking for `slotId` and returns the server-issued
- * identifiers and amount.
- *
- * TODO(payments): replace the body with a call to the payment Edge Function.
- * The `amount` handed to the gateway must come from that server response —
- * never from a component.
+ * Calls `initiate-checkout` for a held slot and returns the server-issued
+ * booking identifiers plus the Safepay session tokens. Throws the Edge
+ * Function's error message (slot no longer held, venue not configured, …)
+ * so the UI can show it verbatim.
  */
 export async function createPendingBooking(slotId: string): Promise<PendingBooking> {
-  // Referenced so the parameter stays meaningful once the backend lands.
-  void slotId
-  throw new PaymentBackendNotReadyError(
-    "The payment backend is not connected yet: no server endpoint can create a pending booking or a Safepay session.",
+  if (!isSupabaseConfigured()) throw new CheckoutNotConfiguredError()
+  const { data, error } = await getSupabaseBrowserClient().functions.invoke(
+    "initiate-checkout",
+    { body: { slot_id: slotId } },
   )
+  if (error) throw new Error(error.message || "Could not start checkout.")
+  const payload = (data ?? {}) as InitiateCheckoutResponse
+  if (payload.error) throw new Error(payload.error)
+  if (!payload.booking_id) {
+    throw new Error("The checkout session could not be created. Please try again.")
+  }
+  return {
+    bookingId: payload.booking_id,
+    bookingRef: payload.booking_ref ?? "",
+    amount: Number(payload.amount ?? 0),
+    tracker: payload.tracker ?? "",
+    tbt: payload.tbt ?? "",
+  }
 }

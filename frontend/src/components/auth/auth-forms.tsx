@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Notice } from "@/components/app/notice"
 import { getErrorMessage, getPasswordStrength, normalizePhone } from "@/lib/utils"
-import { signIn, signUp } from "@/lib/auth"
+import { homePathForRole, signIn, signUp } from "@/lib/auth"
+import { fetchProfile } from "@/lib/queries/profile"
 
-export function CustomerSignInForm({ nextPath = "/" }: { nextPath?: string }) {
+export function CustomerSignInForm({ nextPath = null }: { nextPath?: string | null }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -26,8 +27,16 @@ export function CustomerSignInForm({ nextPath = "/" }: { nextPath?: string }) {
     event.preventDefault()
     setError(null)
     try {
-      await mutation.mutateAsync()
-      router.push(nextPath)
+      const result = await mutation.mutateAsync()
+      // Smart redirect: an explicit `?next=` (the booking round trip) wins,
+      // otherwise the role decides the landing page so an owner or admin never
+      // dumps a customer onto the marketplace home.
+      const target =
+        nextPath ??
+        homePathForRole(
+          result.user ? (await fetchProfile(result.user.id))?.role : null,
+        )
+      router.push(target)
       router.refresh()
     } catch (caught) {
       setError(getErrorMessage(caught))

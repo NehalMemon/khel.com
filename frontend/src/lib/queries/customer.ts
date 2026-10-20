@@ -1,11 +1,11 @@
 import type {
   BookingRow,
   BookingStatus,
-  CourtRow,
   Database,
   HoldSlotResult,
   NearbyVenueRow,
   PaymentStatus,
+  ResourceRow,
   SlotRow,
   SlotStatus,
   VenueRow,
@@ -19,9 +19,11 @@ export type VenueFilters = {
 }
 
 export type PublicVenueRow = Omit<VenueRow, "owner_id">
-export type PublicVenueWithCourts = PublicVenueRow & {
-  courts: CourtRow[]
+export type PublicVenueWithResources = PublicVenueRow & {
+  resources: ResourceRow[]
 }
+/** @deprecated Pre-migration alias kept so older imports keep compiling. */
+export type PublicVenueWithCourts = PublicVenueWithResources
 export type PublicSlotRow = Omit<SlotRow, "held_by" | "held_until">
 export type CustomerBookingRow = Omit<
   BookingRow,
@@ -33,22 +35,22 @@ export type BookingActionRow = Omit<
 >
 
 /** A public venue plus its PostGIS distance from the user's coordinates. */
-export type NearbyVenue = PublicVenueWithCourts & {
+export type NearbyVenue = PublicVenueWithResources & {
   distanceKm: number
   images: string[]
 }
 
 const publicVenueFields =
-  "id, name, slug, description, address, coordinates, area_id, status, avg_rating, amenities, created_at, updated_at"
-/** Public court fields; `sport_type` is the display label. */
-const courtFields =
-  "id, venue_id, name, sport_type, hourly_rate, metadata, created_at, updated_at"
+  "id, name, slug, description, address, coordinates, area_id, status, avg_rating, amenities, max_advance_booking_days, operating_hours, subscription_tier, created_at, updated_at"
+/** Public resource fields; `category` is the display/grouping label. */
+const resourceFields =
+  "id, venue_id, name, category, hourly_rate, metadata, parent_id, is_active, created_at, updated_at"
 const publicSlotFields =
   "id, court_id, date, start_time, end_time, status"
 const customerBookingFields =
-  "id, booking_ref, customer_id, slot_id, court_id, venue_id, status, payment_status, total_charged, created_at, updated_at"
+  "id, booking_ref, customer_id, slot_id, resource_id, venue_id, status, payment_status, total_charged, created_at, updated_at, start_time, end_time"
 const bookingActionFields =
-  "id, booking_ref, slot_id, court_id, venue_id, status, payment_status, total_charged, created_at, updated_at"
+  "id, booking_ref, slot_id, resource_id, venue_id, status, payment_status, total_charged, created_at, updated_at, start_time, end_time"
 
 function requireConfigured(): void {
   if (!isSupabaseConfigured()) {
@@ -60,13 +62,13 @@ function handleError(error: { message: string } | null): void {
   if (error) throw new Error(error.message)
 }
 
-function attachCourts(
+function attachResources(
   venues: PublicVenueRow[],
-  courts: CourtRow[],
-): PublicVenueWithCourts[] {
+  resources: ResourceRow[],
+): PublicVenueWithResources[] {
   return venues.map((venue) => ({
     ...venue,
-    courts: courts.filter((court) => court.venue_id === venue.id),
+    resources: resources.filter((resource) => resource.venue_id === venue.id),
   }))
 }
 
@@ -76,7 +78,7 @@ function attachCourts(
 
 export async function fetchPublishedVenues(
   filters: VenueFilters = {},
-): Promise<PublicVenueWithCourts[]> {
+): Promise<PublicVenueWithResources[]> {
   if (!isSupabaseConfigured()) return []
   const client = getSupabaseBrowserClient()
   let request = client
@@ -96,18 +98,18 @@ export async function fetchPublishedVenues(
   handleError(error)
   const venues = (data ?? []) as PublicVenueRow[]
   if (venues.length === 0) return []
-  const { data: courtData, error: courtError } = await client
-    .from("courts")
-    .select(courtFields)
+  const { data: resourceData, error: resourceError } = await client
+    .from("resources")
+    .select(resourceFields)
     .in(
       "venue_id",
       venues.map((venue) => venue.id),
     )
-  handleError(courtError)
-  return attachCourts(venues, (courtData ?? []) as CourtRow[]).filter((venue) => {
+  handleError(resourceError)
+  return attachResources(venues, (resourceData ?? []) as ResourceRow[]).filter((venue) => {
     if (!filters.sport) return true
-    return venue.courts.some(
-      (court) => court.sport_type?.toLowerCase() === filters.sport?.toLowerCase(),
+    return venue.resources.some(
+      (resource) => resource.category?.toLowerCase() === filters.sport?.toLowerCase(),
     )
   })
 }
@@ -151,18 +153,18 @@ export async function fetchNearbyVenues(input: {
       Boolean(entry.venue),
     )
   if (ordered.length === 0) return []
-  const { data: courtData, error: courtError } = await client
-    .from("courts")
-    .select(courtFields)
+  const { data: resourceData, error: resourceError } = await client
+    .from("resources")
+    .select(resourceFields)
     .in(
       "venue_id",
       ordered.map((entry) => entry.venue.id),
     )
-  handleError(courtError)
-  const allCourts = (courtData ?? []) as CourtRow[]
+  handleError(resourceError)
+  const allResources = (resourceData ?? []) as ResourceRow[]
   return ordered.map(({ row, venue }) => ({
     ...venue,
-    courts: allCourts.filter((court) => court.venue_id === venue.id),
+    resources: allResources.filter((resource) => resource.venue_id === venue.id),
     distanceKm: Number(row.distance_km),
     // The RPC already projects `amenities->'images'`, so read that column and
     // only fall back to the raw jsonb bag if it is missing.
@@ -177,7 +179,7 @@ function toStringList(value: unknown): string[] {
 
 export async function fetchVenueBySlug(
   slug: string,
-): Promise<PublicVenueWithCourts | null> {
+): Promise<PublicVenueWithResources | null> {
   if (!isSupabaseConfigured()) return null
   const client = getSupabaseBrowserClient()
   const { data, error } = await client
@@ -189,13 +191,30 @@ export async function fetchVenueBySlug(
   handleError(error)
   if (!data) return null
   const venue = data as PublicVenueRow
-  const { data: courtData, error: courtError } = await client
-    .from("courts")
-    .select(courtFields)
+  const { data: resourceData, error: resourceError } = await client
+    .from("resources")
+    .select(resourceFields)
     .eq("venue_id", venue.id)
     .order("name")
-  handleError(courtError)
-  return { ...venue, courts: (courtData ?? []) as CourtRow[] }
+  handleError(resourceError)
+  return { ...venue, resources: (resourceData ?? []) as ResourceRow[] }
+}
+
+/**
+ * Every resource of a venue (flat assets + rooms + the assets nested inside
+ * those rooms), in one request. The storefront groups the nested rows under
+ * their parent for the "movie theater" category view, and the owner timeline
+ * renders the same hierarchy.
+ */
+export async function fetchVenueResources(venueId: string): Promise<ResourceRow[]> {
+  if (!isSupabaseConfigured()) return []
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("resources")
+    .select(resourceFields)
+    .eq("venue_id", venueId)
+    .order("name")
+  handleError(error)
+  return (data ?? []) as ResourceRow[]
 }
 
 /* -------------------------------------------------------------------------- */

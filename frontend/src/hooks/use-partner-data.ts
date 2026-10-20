@@ -2,30 +2,36 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type {
-  CourtInsert,
-  CourtUpdate,
   ProfileUpdate,
+  ResourceInsert,
+  ResourceUpdate,
   VenueUpdate,
 } from "@/lib/database.types"
 import {
   cancelBookingByVenue,
-  createCourt,
+  createResource,
   createSlots,
   createVenue,
+  createWalkInBooking,
+  deleteResource,
   fetchOwnedBookings,
   fetchOwnedTeamMembers,
   fetchOwnedVenues,
   fetchOwnerSlots,
+  fetchVenueBookings,
+  inviteTeamMember,
   markBookingCompleted,
   markBookingNoShow,
   setOwnerSlotStatus,
   submitVenueForReview,
-  updateCourt,
+  updateResource,
   updateVenue,
   uploadImageToCloudinary,
   type OwnerSlotStatus,
+  type InviteTeamMemberValues,
   type PartnerSlotValues,
   type PartnerVenueValues,
+  type WalkInBookingValues,
 } from "@/lib/queries/partner"
 import { updateProfile } from "@/lib/queries/profile"
 
@@ -47,11 +53,35 @@ export function usePartnerBookings(ownerId: string | null) {
   })
 }
 
+/**
+ * One venue's bookings on one date — the data behind the timeline POS grid.
+ * Refreshed on a short cadence because walk-ins arrive while the page is open.
+ */
+export function useVenueBookings(venueId: string | null, date: string) {
+  return useQuery({
+    queryKey: ["partner", "bookings", "venue", venueId, date],
+    queryFn: () => fetchVenueBookings(venueId as string, date),
+    enabled: Boolean(venueId && date),
+    refetchInterval: 30_000,
+  })
+}
+
 export function usePartnerTeam(ownerId: string | null) {
   return useQuery({
     queryKey: ["partner", "team", ownerId],
     queryFn: () => fetchOwnedTeamMembers(ownerId as string),
     enabled: Boolean(ownerId),
+  })
+}
+
+/** Sends an invite via the `invite-team-member` Edge Function. */
+export function useInviteTeamMemberMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (values: InviteTeamMemberValues) => inviteTeamMember(values),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["partner", "team"] })
+    },
   })
 }
 
@@ -112,23 +142,44 @@ export function useSubmitVenueMutation() {
   })
 }
 
-export function useCreateCourtMutation() {
+export function useCreateResourceMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (values: CourtInsert) => createCourt(values),
+    mutationFn: (values: ResourceInsert) => createResource(values),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["partner"] })
     },
   })
 }
 
-export function useUpdateCourtMutation() {
+export function useUpdateResourceMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ courtId, values }: { courtId: string; values: CourtUpdate }) =>
-      updateCourt(courtId, values),
+    mutationFn: ({ resourceId, values }: { resourceId: string; values: ResourceUpdate }) =>
+      updateResource(resourceId, values),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["partner"] })
+    },
+  })
+}
+
+export function useDeleteResourceMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (resourceId: string) => deleteResource(resourceId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["partner"] })
+    },
+  })
+}
+
+/** Walk-in block from the timeline POS: creates the booking row directly. */
+export function useCreateWalkInBookingMutation(ownerId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (values: WalkInBookingValues) => createWalkInBooking(ownerId, values),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["partner", "bookings"] })
     },
   })
 }

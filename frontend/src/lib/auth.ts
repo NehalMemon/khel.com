@@ -96,5 +96,22 @@ export async function signOut() {
   if (error) throw error
 }
 
+/**
+ * Where each role lands after authenticating. Customers with an explicit
+ * `?next=` (the booking round trip) keep that destination; everyone else gets
+ * their workspace so an owner never has to hunt for the portal.
+ */
+export function homePathForRole(role: UserRole | null | undefined): string {
+  switch (role) {
+    case "super_admin":
+    case "admin":
+      return "/admin"
+    case "venue_owner":
+      return "/partner/overview"
+    default:
+      return "/"
+  }
+}
+
 export type DatabaseClient = ReturnType<typeof getSupabaseBrowserClient>
 export type SupabaseDatabase = Database

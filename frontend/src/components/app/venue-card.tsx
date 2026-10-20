@@ -26,13 +26,13 @@ export function VenueCard({
 }) {
   const sportTypes = Array.from(
     new Set(
-      venue.courts
-        .map((court) => court.sport_type)
+      venue.resources
+        .map((resource) => resource.category)
         .filter((sport): sport is string => Boolean(sport)),
     ),
   )
-  const lowestRate = venue.courts.length
-    ? Math.min(...venue.courts.map((court) => court.hourly_rate))
+  const lowestRate = venue.resources.length
+    ? Math.min(...venue.resources.map((resource) => resource.hourly_rate))
     : null
   const cover = images?.find((image) => typeof image === "string" && image.length > 0)
   return (

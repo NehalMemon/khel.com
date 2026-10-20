@@ -8,20 +8,21 @@ import type {
   VenueStatus,
 } from "@/lib/database.types"
 import {
+  approveVenueApplication,
   fetchAllBookings,
-  fetchAllCourts,
+  fetchAllResources,
   fetchAllVenues,
   fetchProfiles,
   fetchReviewVenues,
   fetchVenueApplications,
   updateAppConfig,
-  updateCourt,
   updateProfileRole,
   updateProfileTier,
+  updateResource,
   updateReviewStatus,
   updateVenueApplicationStatus,
 } from "@/lib/queries/admin"
-import type { AppConfigValues } from "@/lib/queries/admin"
+import type { AppConfigValues, ApproveVenueResult } from "@/lib/queries/admin"
 
 /* -------------------------------- queries -------------------------------- */
 
@@ -39,10 +40,10 @@ export function useAllVenues(status?: VenueStatus) {
   })
 }
 
-export function useAllCourts() {
+export function useAllResources() {
   return useQuery({
-    queryKey: ["admin", "courts"],
-    queryFn: fetchAllCourts,
+    queryKey: ["admin", "resources"],
+    queryFn: fetchAllResources,
   })
 }
 
@@ -110,14 +111,14 @@ export function useUpdateTierMutation() {
   )
 }
 
-export function useUpdateCourtMutation() {
+export function useUpdateResourceMutation() {
   return useAdminMutation<
     {
-      courtId: string
-      values: { name?: string; sport_type?: string | null; hourly_rate?: number }
+      resourceId: string
+      values: { name?: string; category?: string | null; hourly_rate?: number }
     },
     unknown
-  >(({ courtId, values }) => updateCourt(courtId, values), [["admin", "courts"]])
+  >(({ resourceId, values }) => updateResource(resourceId, values), [["admin", "resources"]])
 }
 
 export function useUpdateAppConfigMutation() {
@@ -142,4 +143,16 @@ export function useUpdateVenueApplicationStatusMutation() {
       updateVenueApplicationStatus(id, status, adminNotes),
     [["admin", "venue_applications"]],
   )
+}
+
+/**
+ * Approval runs through the `approve-venue` Edge Function (invite + venue
+ * provisioning + status flip happen server-side). Rejecting keeps using the
+ * direct status mutation above, since there is nothing to orchestrate there.
+ */
+export function useApproveVenueApplicationMutation() {
+  return useAdminMutation<string, ApproveVenueResult>(approveVenueApplication, [
+    ["admin", "venue_applications"],
+    ["admin", "venues"],
+  ])
 }

@@ -1,4 +1,4 @@
-import type { Database as GeneratedDatabase, Tables, TablesInsert, Enums } from "@/types/database.types"
+import type { Database as GeneratedDatabase, Tables, TablesInsert, Enums, Json } from "@/types/database.types"
 
 export type { Json } from "@/types/database.types"
 export type { Database, Tables, TablesInsert, TablesUpdate, Enums } from "@/types/database.types"
@@ -37,9 +37,39 @@ export type VenueInsert = TablesInsert<"venues">
 export type VenueRecordUpdate = Partial<Omit<VenueInsert, "owner_id">>
 export type VenueUpdate = Partial<Pick<VenueInsert, "name" | "slug" | "description" | "address" | "coordinates" | "area_id" | "amenities">>
 
-export type CourtRow = Tables<"courts">
-export type CourtInsert = TablesInsert<"courts">
-export type CourtUpdate = Partial<Omit<CourtInsert, "venue_id">>
+/**
+ * `resources` (migration 20261019140036) is the universal inventory table that
+ * replaced `courts`. An adjacency list: a top-level row (`parent_id = null`) is
+ * a standalone asset ("PC 1") or a composite zone ("VIP Room"), and a nested
+ * row (`parent_id = <room id>`) is an asset inside that zone ("VIP PC 1").
+ * `category` (renamed from `sport_type`) is the customer-facing grouping label.
+ */
+export type ResourceRow = Tables<"resources">
+export type ResourceInsert = TablesInsert<"resources">
+export type ResourceUpdate = Partial<Omit<ResourceInsert, "venue_id">>
+
+/** Venue-owner-writable resource columns. */
+export type ResourceValues = Pick<ResourceInsert, "name" | "category" | "hourly_rate"> & {
+  parent_id?: string | null
+  is_active?: boolean
+  metadata?: Json
+}
+
+/** `resources.parent_id` resolved to the parent resource row (or null). */
+export type ResourceWithChildren = ResourceRow & { children: ResourceRow[] }
+
+/**
+ * Optional `resources.metadata` keys owned by the Pro tier. Kept as a narrow
+ * reader so the UI can gate advanced pricing packages behind
+ * `venues.subscription_tier === 'pro'`.
+ */
+export type ResourceMetadata = {
+  capacity?: number
+  booking_model?: string
+  night_owl_pricing?: Json
+  duration_discounts?: Json
+  [key: string]: Json | undefined
+}
 
 export type SlotRow = Tables<"slots">
 export type SlotInsert = TablesInsert<"slots">

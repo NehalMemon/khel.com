@@ -11,6 +11,7 @@ import {
   fetchSlots,
   fetchSlotsForCourts,
   fetchVenueBySlug,
+  fetchVenueResources,
   holdSlot,
   type VenueFilters,
 } from "@/lib/queries/customer"
@@ -48,6 +49,15 @@ export function useVenue(slug: string) {
     queryKey: ["venues", "published", slug],
     queryFn: () => fetchVenueBySlug(slug),
     enabled: Boolean(slug),
+  })
+}
+
+/** The venue's whole inventory tree (flat assets + rooms + nested assets). */
+export function useVenueResources(venueId: string | null) {
+  return useQuery({
+    queryKey: ["resources", "venue", venueId],
+    queryFn: () => fetchVenueResources(venueId as string),
+    enabled: Boolean(venueId),
   })
 }
 

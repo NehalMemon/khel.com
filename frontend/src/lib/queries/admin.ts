@@ -1,9 +1,9 @@
 import type {
   ApplicationStatus,
   BookingRow,
-  CourtRow,
   Database,
   ProfileRow,
+  ResourceRow,
   SubscriptionTier,
   UserRole,
   VenueApplicationRow,
@@ -15,15 +15,15 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-b
 import { getErrorMessage } from "@/lib/utils"
 
 const venueFields =
-  "id, owner_id, name, slug, description, address, coordinates, area_id, status, avg_rating, amenities, created_at, updated_at"
-const courtFields =
-  "id, venue_id, name, sport_type, hourly_rate, metadata, created_at, updated_at"
+  "id, owner_id, name, slug, description, address, coordinates, area_id, status, avg_rating, amenities, max_advance_booking_days, operating_hours, subscription_tier, created_at, updated_at"
+const resourceFields =
+  "id, venue_id, name, category, hourly_rate, metadata, parent_id, is_active, created_at, updated_at"
 const bookingFields =
-  "id, booking_ref, customer_id, slot_id, court_id, venue_id, status, payment_status, payment_gateway_ref, total_charged, venue_payout_amount, commission_amount_snapshot, created_at, updated_at"
+  "id, booking_ref, customer_id, slot_id, resource_id, venue_id, status, payment_status, payment_gateway_ref, total_charged, venue_payout_amount, commission_amount_snapshot, start_time, end_time, created_at, updated_at"
 const profileFields =
   "id, name, email, phone, avatar_url, role, subscription_tier, platform_permissions, created_at, updated_at"
 
-export type AdminVenue = VenueRow & { courts: CourtRow[] }
+export type AdminVenue = VenueRow & { resources: ResourceRow[] }
 
 function requireConfigured(): void {
   if (!isSupabaseConfigured()) {
@@ -89,21 +89,21 @@ export async function updateProfileTier(
 /* Venues                                                                       */
 /* -------------------------------------------------------------------------- */
 
-async function attachCourts(venues: VenueRow[]): Promise<AdminVenue[]> {
+async function attachResources(venues: VenueRow[]): Promise<AdminVenue[]> {
   if (venues.length === 0) return []
-  const { data: courtData, error } = await getSupabaseBrowserClient()
-    .from("courts")
-    .select(courtFields)
+  const { data: resourceData, error } = await getSupabaseBrowserClient()
+    .from("resources")
+    .select(resourceFields)
     .in(
       "venue_id",
       venues.map((venue) => venue.id),
     )
     .order("name")
   handleError(error)
-  const courts = (courtData ?? []) as CourtRow[]
+  const resources = (resourceData ?? []) as ResourceRow[]
   return venues.map((venue) => ({
     ...venue,
-    courts: courts.filter((court) => court.venue_id === venue.id),
+    resources: resources.filter((resource) => resource.venue_id === venue.id),
   }))
 }
 
@@ -115,7 +115,7 @@ export async function fetchReviewVenues(): Promise<AdminVenue[]> {
     .in("status", ["submitted", "under_review", "approved"])
     .order("updated_at", { ascending: true })
   handleError(error)
-  return attachCourts((data ?? []) as VenueRow[])
+  return attachResources((data ?? []) as VenueRow[])
 }
 
 export async function fetchAllVenues(status?: VenueStatus): Promise<AdminVenue[]> {
@@ -126,7 +126,7 @@ export async function fetchAllVenues(status?: VenueStatus): Promise<AdminVenue[]
   if (status) request = request.eq("status", status)
   const { data, error } = await request.order("created_at", { ascending: false })
   handleError(error)
-  return attachCourts((data ?? []) as VenueRow[])
+  return attachResources((data ?? []) as VenueRow[])
 }
 
 /**
@@ -166,27 +166,27 @@ export function canTransitionVenue(from: VenueStatus, to: VenueStatus): boolean 
 }
 
 /* -------------------------------------------------------------------------- */
-/* Courts                                                                       */
+/* Resources (platform-wide inventory)                                          */
 /* -------------------------------------------------------------------------- */
 
-export type AdminCourt = CourtRow & { venueName: string; venueSlug: string }
+export type AdminResource = ResourceRow & { venueName: string; venueSlug: string }
 
-export async function fetchAllCourts(): Promise<AdminCourt[]> {
+export async function fetchAllResources(): Promise<AdminResource[]> {
   if (!isSupabaseConfigured()) return []
   const client = getSupabaseBrowserClient()
   const { data, error } = await client
-    .from("courts")
-    .select(courtFields)
+    .from("resources")
+    .select(resourceFields)
     .order("created_at", { ascending: false })
   handleError(error)
-  const courts = (data ?? []) as CourtRow[]
-  if (courts.length === 0) return []
+  const resources = (data ?? []) as ResourceRow[]
+  if (resources.length === 0) return []
   const { data: venueData, error: venueError } = await client
     .from("venues")
     .select("id, name, slug")
     .in(
       "id",
-      courts.map((court) => court.venue_id),
+      resources.map((resource) => resource.venue_id),
     )
   handleError(venueError)
   const venuesById = new Map(
@@ -195,29 +195,29 @@ export async function fetchAllCourts(): Promise<AdminCourt[]> {
       venue,
     ]),
   )
-  return courts.map((court) => {
-    const venue = venuesById.get(court.venue_id)
+  return resources.map((resource) => {
+    const venue = venuesById.get(resource.venue_id)
     return {
-      ...court,
+      ...resource,
       venueName: venue?.name ?? "Unknown venue",
       venueSlug: venue?.slug ?? "",
     }
   })
 }
 
-export async function updateCourt(
-  courtId: string,
-  values: { name?: string; sport_type?: string | null; hourly_rate?: number },
-): Promise<CourtRow> {
+export async function updateResource(
+  resourceId: string,
+  values: { name?: string; category?: string | null; hourly_rate?: number },
+): Promise<ResourceRow> {
   requireConfigured()
   const { data, error } = await getSupabaseBrowserClient()
-    .from("courts")
+    .from("resources")
     .update(values)
-    .eq("id", courtId)
-    .select(courtFields)
+    .eq("id", resourceId)
+    .select(resourceFields)
     .single()
   handleError(error)
-  return data as CourtRow
+  return data as ResourceRow
 }
 
 /* -------------------------------------------------------------------------- */
@@ -320,6 +320,32 @@ export async function updateVenueApplicationStatus(
     .single()
   handleError(error)
   return data as VenueApplicationRow
+}
+
+export type ApproveVenueResult = {
+  success: boolean
+  message?: string
+  error?: string
+}
+
+/**
+ * Approval goes through the `approve-venue` Edge Function, not a direct table
+ * write: approving also invites the applicant as `venue_owner`, provisions the
+ * draft venue, and flips the application status in one server-side transaction
+ * the browser must not split up.
+ */
+export async function approveVenueApplication(
+  applicationId: string,
+): Promise<ApproveVenueResult> {
+  requireConfigured()
+  const { data, error } = await getSupabaseBrowserClient().functions.invoke(
+    "approve-venue",
+    { body: { application_id: applicationId } },
+  )
+  if (error) throw new Error(error.message || "The approval request failed.")
+  const payload = (data ?? {}) as ApproveVenueResult
+  if (payload && payload.error) throw new Error(payload.error)
+  return { success: true, message: payload.message }
 }
 
 export type DatabaseSchema = Database

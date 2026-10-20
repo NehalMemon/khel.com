@@ -29,7 +29,7 @@ export function PartnersPage() {
           partner,
           venues: owned,
           liveCount: owned.filter((venue) => venue.status === "published").length,
-          courtCount: owned.reduce((total, venue) => total + venue.courts.length, 0),
+          resourceCount: owned.reduce((total, venue) => total + venue.resources.length, 0),
         }
       })
       .filter((row) => {
@@ -37,7 +37,7 @@ export function PartnersPage() {
         const label = (row.partner.name ?? row.partner.id).toLowerCase()
         return label.includes(needle) || row.venues.some((v) => v.name.toLowerCase().includes(needle))
       })
-      .sort((a, b) => b.courtCount - a.courtCount)
+      .sort((a, b) => b.resourceCount - a.resourceCount)
   }, [partnersQuery.data, search, venuesQuery.data])
 
   if (partnersQuery.isPending || venuesQuery.isPending) {
@@ -103,13 +103,13 @@ export function PartnersPage() {
                   <TableHead>Owner</TableHead>
                   <TableHead>Tier</TableHead>
                   <TableHead>Venues</TableHead>
-                  <TableHead>Courts</TableHead>
+                  <TableHead>Resources</TableHead>
                   <TableHead>Portfolio</TableHead>
                   <TableHead>Joined</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map(({ partner, venues, liveCount, courtCount }) => (
+                {rows.map(({ partner, venues, liveCount, resourceCount }) => (
                   <TableRow key={partner.id}>
                     <TableCell>
                       <p className="font-semibold">{partner.name ?? `User ${partner.id.slice(0, 8)}`}</p>
@@ -125,7 +125,7 @@ export function PartnersPage() {
                     <TableCell>
                       {venues.length} ({liveCount} live)
                     </TableCell>
-                    <TableCell>{courtCount}</TableCell>
+                    <TableCell>{resourceCount}</TableCell>
                     <TableCell>
                       {venues.length === 0 ? (
                         <span className="text-muted-foreground">No listings yet</span>

@@ -1,10 +1,10 @@
 import type {
   BookingRow,
   BookingStatus,
-  CourtInsert,
-  CourtRow,
-  CourtUpdate,
   Json,
+  ResourceInsert,
+  ResourceRow,
+  ResourceUpdate,
   SlotInsert,
   SlotRow,
   SlotStatus,
@@ -25,14 +25,16 @@ import {
 /* -------------------------------------------------------------------------- */
 
 const venueFields =
-  "id, owner_id, name, slug, description, address, coordinates, area_id, status, avg_rating, amenities, created_at, updated_at"
-const courtFields =
-  "id, venue_id, name, sport_type, hourly_rate, metadata, created_at, updated_at"
+  "id, owner_id, name, slug, description, address, coordinates, area_id, status, avg_rating, amenities, max_advance_booking_days, operating_hours, subscription_tier, created_at, updated_at"
+const resourceFields =
+  "id, venue_id, name, category, hourly_rate, metadata, parent_id, is_active, created_at, updated_at"
 const slotFields = "id, court_id, date, start_time, end_time, status, held_by, held_until"
 const partnerBookingFields =
-  "id, booking_ref, slot_id, court_id, venue_id, status, payment_status, total_charged, venue_payout_amount, created_at, updated_at"
+  "id, booking_ref, slot_id, resource_id, venue_id, status, payment_status, total_charged, venue_payout_amount, start_time, end_time, created_at, updated_at"
 
-export type VenueWithCourts = VenueRow & { courts: CourtRow[] }
+export type VenueWithResources = VenueRow & { resources: ResourceRow[] }
+/** @deprecated Pre-migration alias kept so older imports keep compiling. */
+export type VenueWithCourts = VenueWithResources
 export type PublicSlotRow = Omit<SlotRow, "held_by" | "held_until">
 export type PartnerBookingRow = Omit<
   BookingRow,
@@ -69,7 +71,7 @@ export { readVenueImages, withVenueImages }
 /* Venues                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export async function fetchOwnedVenues(ownerId: string): Promise<VenueWithCourts[]> {
+export async function fetchOwnedVenues(ownerId: string): Promise<VenueWithResources[]> {
   if (!isSupabaseConfigured()) return []
   const client = getSupabaseBrowserClient()
   const { data, error } = await client
@@ -80,19 +82,19 @@ export async function fetchOwnedVenues(ownerId: string): Promise<VenueWithCourts
   handleError(error)
   const venues = (data ?? []) as VenueRow[]
   if (venues.length === 0) return []
-  const { data: courtData, error: courtError } = await client
-    .from("courts")
-    .select(courtFields)
+  const { data: resourceData, error: resourceError } = await client
+    .from("resources")
+    .select(resourceFields)
     .in(
       "venue_id",
       venues.map((venue) => venue.id),
     )
     .order("name")
-  handleError(courtError)
-  const courts = (courtData ?? []) as CourtRow[]
+  handleError(resourceError)
+  const resources = (resourceData ?? []) as ResourceRow[]
   return venues.map((venue) => ({
     ...venue,
-    courts: courts.filter((court) => court.venue_id === venue.id),
+    resources: resources.filter((resource) => resource.venue_id === venue.id),
   }))
 }
 
@@ -143,30 +145,49 @@ export async function submitVenueForReview(venueId: string): Promise<VenueRow> {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Courts                                                                      */
+/* Resources (universal inventory: flat assets + nested rooms/zones)           */
 /* -------------------------------------------------------------------------- */
 
-export async function createCourt(values: CourtInsert): Promise<CourtRow> {
+/**
+ * Creates one inventory row. `parent_id` is what makes a resource "nested":
+ * leave it `null` for a flat asset (or a new room/zone), or pass a room's id to
+ * place the asset inside that room. The customer never picks the specific row —
+ * the storefront auto-assigns whichever row in the category is free.
+ */
+export async function createResource(values: ResourceInsert): Promise<ResourceRow> {
   requireConfigured()
   const { data, error } = await getSupabaseBrowserClient()
-    .from("courts")
+    .from("resources")
     .insert(values)
-    .select(courtFields)
+    .select(resourceFields)
     .single()
   handleError(error)
-  return data as CourtRow
+  return data as ResourceRow
 }
 
-export async function updateCourt(courtId: string, values: CourtUpdate): Promise<CourtRow> {
+export async function updateResource(
+  resourceId: string,
+  values: ResourceUpdate,
+): Promise<ResourceRow> {
   requireConfigured()
   const { data, error } = await getSupabaseBrowserClient()
-    .from("courts")
+    .from("resources")
     .update(values)
-    .eq("id", courtId)
-    .select(courtFields)
+    .eq("id", resourceId)
+    .select(resourceFields)
     .single()
   handleError(error)
-  return data as CourtRow
+  return data as ResourceRow
+}
+
+/** Remove an asset or room. Children cascade via the `parent_id` FK. */
+export async function deleteResource(resourceId: string): Promise<void> {
+  requireConfigured()
+  const { error } = await getSupabaseBrowserClient()
+    .from("resources")
+    .delete()
+    .eq("id", resourceId)
+  handleError(error)
 }
 
 /* -------------------------------------------------------------------------- */
@@ -258,6 +279,81 @@ export async function fetchOwnedBookings(ownerId: string): Promise<PartnerBookin
 }
 
 /**
+ * Bookings for one venue on one date, for the timeline POS grid. Kept as its
+ * own query so the walk-in view refreshes on its own cadence instead of
+ * invalidating the owner's whole booking list.
+ */
+export async function fetchVenueBookings(
+  venueId: string,
+  date: string,
+): Promise<PartnerBookingRow[]> {
+  if (!isSupabaseConfigured()) return []
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("bookings")
+    .select(partnerBookingFields)
+    .eq("venue_id", venueId)
+    .neq("status", "cancelled_by_customer")
+    .neq("status", "cancelled_by_venue")
+    .order("created_at", { ascending: true })
+  handleError(error)
+  // Legacy (slot-based) bookings have no `start_time`; they are filtered out
+  // of the timeline rather than guessed at. `date` filters the dynamic
+  // start_time window below.
+  const dayStart = `${date}T00:00:00`
+  const dayEnd = `${date}T23:59:59`
+  return ((data ?? []) as PartnerBookingRow[]).filter((booking) => {
+    if (!booking.start_time) return false
+    return booking.start_time >= dayStart && booking.start_time <= dayEnd
+  })
+}
+
+export type WalkInBookingValues = {
+  venueId: string
+  resourceId: string
+  /** `HH:MM` on `date`, local time. */
+  startTime: string
+  /** `HH:MM` on `date`, local time, strictly after `startTime`. */
+  endTime: string
+  date: string
+  customerName?: string
+}
+
+/**
+ * Rapid walk-in block. The timeline POS creates the booking record directly —
+ * no Safepay session — which simply occupies the time on the grid. The signed-in
+ * owner is recorded as `customer_id` because the `Customers can insert bookings`
+ * RLS policy only allows inserts where `customer_id = auth.uid()`; the block
+ * reserves the time, and the guest's name stays at the venue's door register.
+ */
+export async function createWalkInBooking(
+  ownerId: string,
+  values: WalkInBookingValues,
+): Promise<PartnerBookingRow> {
+  requireConfigured()
+  const suffix = Math.random().toString(36).substring(2, 7).toUpperCase()
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("bookings")
+    .insert({
+      booking_ref: `KHEL-W-${suffix}`,
+      customer_id: ownerId,
+      venue_id: values.venueId,
+      resource_id: values.resourceId,
+      slot_id: null,
+      status: "confirmed",
+      payment_status: "pending",
+      total_charged: 0,
+      venue_payout_amount: 0,
+      commission_amount_snapshot: 0,
+      start_time: `${values.date}T${values.startTime}:00`,
+      end_time: `${values.date}T${values.endTime}:00`,
+    })
+    .select(partnerBookingFields)
+    .single()
+  handleError(error)
+  return data as PartnerBookingRow
+}
+
+/**
  * Venue owners may transition bookings out of `confirmed` only, matching the
  * `owners_update_own_venue_bookings` RLS policy.
  */
@@ -344,6 +440,42 @@ export async function fetchOwnedTeamMembers(ownerId: string): Promise<OwnedTeamM
     ...row,
     venue_name: venueNames.get(row.venue_id) ?? "Venue",
   }))
+}
+
+export type InviteTeamMemberValues = {
+  email: string
+  venueId: string
+  permissions: string[]
+}
+
+export type InviteTeamMemberResult = {
+  success: boolean
+  message?: string
+}
+
+/**
+ * Invites a teammate through the `invite-team-member` Edge Function. The
+ * function verifies the caller owns `venue_id`, creates the auth invite, and
+ * upserts the `venue_team` row — none of which the browser may split up.
+ */
+export async function inviteTeamMember(
+  values: InviteTeamMemberValues,
+): Promise<InviteTeamMemberResult> {
+  requireConfigured()
+  const { data, error } = await getSupabaseBrowserClient().functions.invoke(
+    "invite-team-member",
+    {
+      body: {
+        email: values.email.trim(),
+        venue_id: values.venueId,
+        permissions: values.permissions,
+      },
+    },
+  )
+  if (error) throw new Error(error.message || "The invite request failed.")
+  const payload = (data ?? {}) as InviteTeamMemberResult & { error?: string }
+  if (payload.error) throw new Error(payload.error)
+  return { success: true, message: payload.message ?? "Team member invited." }
 }
 
 /* -------------------------------------------------------------------------- */

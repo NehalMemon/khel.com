@@ -62,7 +62,7 @@ export function DiscoverPage() {
     return rows
       .filter((venue) =>
         matchesSport(
-          venue.courts.map((court) => court.sport_type ?? ""),
+          venue.resources.map((resource) => resource.category ?? ""),
           sport,
         ),
       )
@@ -76,8 +76,8 @@ export function DiscoverPage() {
     return Array.from(
       new Set(
         source
-          .flatMap((venue) => venue.courts)
-          .map((court) => court.sport_type)
+          .flatMap((venue) => venue.resources)
+          .map((resource) => resource.category)
           .filter((value): value is string => Boolean(value && value.trim())),
       ),
     ).sort((a, b) => a.localeCompare(b))

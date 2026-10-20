@@ -62,13 +62,15 @@ export type Database = {
         Row: {
           booking_ref: string
           commission_amount_snapshot: number
-          court_id: string
           created_at: string
           customer_id: string
+          end_time: string | null
           id: string
           payment_gateway_ref: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
+          resource_id: string
           slot_id: string | null
+          start_time: string | null
           status: Database["public"]["Enums"]["booking_status"]
           total_charged: number
           updated_at: string
@@ -78,13 +80,15 @@ export type Database = {
         Insert: {
           booking_ref: string
           commission_amount_snapshot?: number
-          court_id: string
           created_at?: string
           customer_id: string
+          end_time?: string | null
           id?: string
           payment_gateway_ref?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          resource_id: string
           slot_id?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_charged: number
           updated_at?: string
@@ -94,13 +98,15 @@ export type Database = {
         Update: {
           booking_ref?: string
           commission_amount_snapshot?: number
-          court_id?: string
           created_at?: string
           customer_id?: string
+          end_time?: string | null
           id?: string
           payment_gateway_ref?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          resource_id?: string
           slot_id?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           total_charged?: number
           updated_at?: string
@@ -109,10 +115,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "bookings_court_id_fkey"
-            columns: ["court_id"]
+            foreignKeyName: "bookings_resource_id_fkey"
+            columns: ["resource_id"]
             isOneToOne: false
-            referencedRelation: "courts"
+            referencedRelation: "resources"
             referencedColumns: ["id"]
           },
           {
@@ -138,43 +144,53 @@ export type Database = {
           },
         ]
       }
-      courts: {
+      resources: {
         Row: {
+          category: string | null
           created_at: string
           hourly_rate: number
           id: string
+          is_active: boolean | null
           metadata: Json
           name: string
-          sport_id: string | null
-          sport_type: string | null
+          parent_id: string | null
           updated_at: string
           venue_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           hourly_rate?: number
           id?: string
+          is_active?: boolean | null
           metadata?: Json
           name: string
-          sport_id?: string | null
-          sport_type?: string | null
+          parent_id?: string | null
           updated_at?: string
           venue_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           hourly_rate?: number
           id?: string
+          is_active?: boolean | null
           metadata?: Json
           name?: string
-          sport_id?: string | null
-          sport_type?: string | null
+          parent_id?: string | null
           updated_at?: string
           venue_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "courts_venue_id_fkey"
+            foreignKeyName: "resources_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"
@@ -334,7 +350,7 @@ export type Database = {
             foreignKeyName: "slots_court_id_fkey"
             columns: ["court_id"]
             isOneToOne: false
-            referencedRelation: "courts"
+            referencedRelation: "resources"
             referencedColumns: ["id"]
           },
           {
@@ -437,10 +453,13 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          max_advance_booking_days: number | null
           name: string
+          operating_hours: Json | null
           owner_id: string
           slug: string
           status: Database["public"]["Enums"]["venue_status"]
+          subscription_tier: string | null
           updated_at: string
         }
         Insert: {
@@ -452,10 +471,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          max_advance_booking_days?: number | null
           name: string
+          operating_hours?: Json | null
           owner_id: string
           slug: string
           status?: Database["public"]["Enums"]["venue_status"]
+          subscription_tier?: string | null
           updated_at?: string
         }
         Update: {
@@ -467,10 +489,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          max_advance_booking_days?: number | null
           name?: string
+          operating_hours?: Json | null
           owner_id?: string
           slug?: string
           status?: Database["public"]["Enums"]["venue_status"]
+          subscription_tier?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -1,19 +1,20 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Users } from "lucide-react"
+import { Loader2, Plus, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
 import { EmptyState, LoadingState } from "@/components/app/loading-state"
 import { Notice } from "@/components/app/notice"
 import { useAuth } from "@/components/auth/auth-provider"
-import { usePartnerTeam } from "@/hooks/use-partner-data"
-import { formatDateTime } from "@/lib/utils"
+import { useInviteTeamMemberMutation, usePartnerTeam, usePartnerVenues } from "@/hooks/use-partner-data"
+import { formatDateTime, getErrorMessage } from "@/lib/utils"
 
 type PermissionOption = {
   id: "view_bookings" | "edit_pricing"
@@ -28,11 +29,21 @@ const PERMISSIONS: PermissionOption[] = [
 export function TeamDashboard() {
   const { profile } = useAuth()
   const teamQuery = usePartnerTeam(profile?.id ?? null)
+  const venuesQuery = usePartnerVenues(profile?.id ?? null)
+  const inviteMutation = useInviteTeamMemberMutation()
   const members = teamQuery.data ?? []
+  const venues = venuesQuery.data ?? []
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState("")
+  const [venueId, setVenueId] = useState("")
   const [selected, setSelected] = useState<string[]>([])
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
+
+  // The Edge Function requires a venue_id, so default to the first venue.
+  const activeVenueId = venues.some((venue) => venue.id === venueId)
+    ? venueId
+    : venues[0]?.id ?? ""
 
   function togglePermission(id: string) {
     setSelected((current) =>
@@ -40,11 +51,30 @@ export function TeamDashboard() {
     )
   }
 
-  function handleInvite() {
-    // UI only — wiring to a Supabase Edge Function is deferred per the task.
-    setInviteError("Inviting team members will be wired to a secure backend Edge Function later.")
-    setEmail("")
-    setSelected([])
+  async function handleInvite() {
+    setInviteError(null)
+    setInviteSuccess(null)
+    if (!email.trim()) {
+      setInviteError("Enter the teammate's email address.")
+      return
+    }
+    if (!activeVenueId) {
+      setInviteError("Create a venue before inviting teammates to it.")
+      return
+    }
+    try {
+      const result = await inviteMutation.mutateAsync({
+        email: email.trim(),
+        venueId: activeVenueId,
+        permissions: selected,
+      })
+      setInviteSuccess(result.message ?? "Invite sent.")
+      setEmail("")
+      setSelected([])
+      setOpen(false)
+    } catch (caught) {
+      setInviteError(getErrorMessage(caught))
+    }
   }
 
   if (teamQuery.isPending) {
@@ -66,14 +96,20 @@ export function TeamDashboard() {
         </p>
         <h1 className="mt-2 text-4xl font-black tracking-[-0.06em]">Team management</h1>
         <p className="mt-2 text-muted-foreground">
-          List of team members across your venues. Invite functionality is UI-only
-          for now and will be wired to a backend Edge Function.
+          List of team members across your venues. Invites run through the
+          `invite-team-member` Edge Function, which creates the account and the
+          team record server-side.
         </p>
       </div>
 
       {inviteError ? (
-        <Notice tone="info" title="Invite coming soon">
+        <Notice tone="error" title="Invite failed">
           {inviteError}
+        </Notice>
+      ) : null}
+      {inviteSuccess ? (
+        <Notice tone="success" title="Invite sent">
+          {inviteSuccess}
         </Notice>
       ) : null}
 
@@ -94,8 +130,8 @@ export function TeamDashboard() {
                 <DialogHeader>
                   <DialogTitle>Invite team member</DialogTitle>
                   <DialogDescription>
-                    Send an invite to a team member with specific permissions.
-                    Wiring to the secure invitation Edge Function is deferred.
+                    Send an invite to a team member with specific permissions for
+                    one of your venues.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4">
@@ -108,6 +144,21 @@ export function TeamDashboard() {
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
                     />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Venue</Label>
+                    <Select value={activeVenueId} onValueChange={setVenueId}>
+                      <SelectTrigger className="h-11 w-full">
+                        <SelectValue placeholder="Choose venue" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {venues.map((venue) => (
+                          <SelectItem key={venue.id} value={venue.id}>
+                            {venue.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label>Permissions</Label>
@@ -128,11 +179,21 @@ export function TeamDashboard() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setOpen(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setOpen(false)}
+                    disabled={inviteMutation.isPending}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={handleInvite} disabled={!email.trim()}>
-                    Send invite
+                  <Button
+                    onClick={() => void handleInvite()}
+                    disabled={!email.trim() || !activeVenueId || inviteMutation.isPending}
+                  >
+                    {inviteMutation.isPending ? (
+                      <Loader2 className="animate-spin" />
+                    ) : null}
+                    {inviteMutation.isPending ? "Sending…" : "Send invite"}
                   </Button>
                 </DialogFooter>
               </DialogContent>

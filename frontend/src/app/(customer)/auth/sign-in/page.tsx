@@ -29,7 +29,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       footer="New here? Create a customer account in seconds."
       backLink={{ href: "/", label: "Back to discover" }}
     >
-      <CustomerSignInForm nextPath={getSafeNextPath(next)} />
+      <CustomerSignInForm nextPath={next ? getSafeNextPath(next) : null} />
     </AuthPageFrame>
   )
 }

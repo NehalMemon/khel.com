@@ -2,23 +2,44 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, LogOut, Menu, UserRound, X } from "lucide-react"
+import { CalendarCheck, LayoutDashboard, LogOut, Menu, ShieldCheck, UserRound, X } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/components/auth/auth-provider"
+import { useAuth, isAdminRole } from "@/components/auth/auth-provider"
 import { Logo } from "@/components/app/logo"
 import { NotificationBell } from "@/components/app/notification-bell"
+import type { UserRole } from "@/lib/database.types"
 
 const links = [
   { href: "/", label: "Discover" },
-  { href: "/bookings", label: "My bookings" },
 ]
+
+/**
+ * Workspace link for the signed-in role. Sending every account to the partner
+ * portal is how an owner ends up staring at an empty customer bookings list, so
+ * the label and destination are both derived from `profiles.role` and the link
+ * disappears entirely when the account has no workspace of its own.
+ */
+function workspaceLink(role: UserRole | null | undefined): {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+} | null {
+  if (isAdminRole(role)) return { href: "/admin", label: "Admin panel", icon: ShieldCheck }
+  if (role === "venue_owner") {
+    return { href: "/partner/overview", label: "Owner dashboard", icon: LayoutDashboard }
+  }
+  if (role === "customer") return { href: "/bookings", label: "My bookings", icon: CalendarCheck }
+  return null
+}
 
 export function SiteHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const { isAuthenticated, profile, signOut } = useAuth()
   const [open, setOpen] = useState(false)
+  const workspace = isAuthenticated ? workspaceLink(profile?.role) : null
+  const WorkspaceIcon = workspace?.icon
 
   async function handleSignOut() {
     await signOut()
@@ -48,13 +69,21 @@ export function SiteHeader() {
         <div className="hidden items-center gap-2 md:flex">
           {isAuthenticated ? (
             <>
-              <Link
-                href="/partner/overview"
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <LayoutDashboard className="size-4" />
-                Partner portal
-              </Link>
+              {workspace && WorkspaceIcon ? (
+                <Link
+                  href={workspace.href}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <WorkspaceIcon className="size-4" />
+                  {workspace.label}
+                </Link>
+              ) : null}
+              {workspace && workspace.href !== "/bookings" ? (
+                <Link href="/bookings" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <CalendarCheck className="size-4" />
+                  My bookings
+                </Link>
+              ) : null}
               <Link href="/profile" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
                 <UserRound className="size-4" />
                 {profile?.name ?? "Profile"}
@@ -103,10 +132,18 @@ export function SiteHeader() {
             ))}
             {isAuthenticated ? (
               <>
-                <Link href="/partner/overview" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted">
-                  <LayoutDashboard className="size-4" />
-                  Partner portal
-                </Link>
+                {workspace && WorkspaceIcon ? (
+                  <Link href={workspace.href} onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted">
+                    <WorkspaceIcon className="size-4" />
+                    {workspace.label}
+                  </Link>
+                ) : null}
+                {workspace && workspace.href !== "/bookings" ? (
+                  <Link href="/bookings" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted">
+                    <CalendarCheck className="size-4" />
+                    My bookings
+                  </Link>
+                ) : null}
                 <Link href="/profile" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted">
                   Profile
                 </Link>

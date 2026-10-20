@@ -16,6 +16,12 @@ export type BookingSelection = {
   slug: string
   courtId: string
   date: string
+  /**
+   * Optional pre-picked slot. The storefront drawer sets it when the customer
+   * must sign in before holding, so they land back on the same showtime.
+   * `courtId` stays the resource id the `hold_slot` RPC needs.
+   */
+  slotId?: string
 }
 
 type BookingSelectionContextValue = {
