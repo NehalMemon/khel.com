@@ -66,3 +66,15 @@
 ## 5. UI/UX Improvements: Booking Flow
 - [ ] **Clean URLs (State Management):** Refactor the booking page to manage the selected `courtId` and `date` using internal React State (e.g., `useState`, Context, or Zustand) instead of appending long UUIDs to URL query parameters.
 - [ ] **Auto-Load Defaults:** Automatically select the first available court by default and auto-load slots for `today` to prevent the "empty screen" effect on initial load.
+
+## 6. Venue Partner Onboarding (Application Flow)
+**Goal:** Replace the legacy "Owner Signup" flow. Venue owners must no longer be directly created in `auth.users`. They must fill out an application form that inserts into the `venue_applications` table, which the Admin will later review.
+
+- [ ] **Route Refactor:** Deprecate the old `/partner/signup` page. Create a new public marketing page/form route (e.g., `/partner/apply` or `/list-your-venue`).
+- [ ] **Application Form UI:** Build a clean, professional application form collecting only the required official data. 
+  - *Fields Required:* Applicant Name, Email Address, Phone Number, Venue Name, Venue Physical Address.
+  - *Optional Fields:* Primary Sport/Category (Futsal, E-Sports, Mixed), Brief Description.
+- [ ] **Database Wiring:** Wire the form submission to insert directly into `public.venue_applications`. 
+  - **CRITICAL:** Do NOT call `supabase.auth.signUp()`. The form simply pushes a row to the database with `status: 'pending'`.
+- [ ] **Success UX:** Upon successful insertion, replace the form with a success state (e.g., "Application Received! Our team will review your venue details. Look out for an invitation email once approved.").
+- [ ] **Auth Redirects:** Ensure the main "Login" screen removes any "Sign up as Venue Owner" buttons, replacing them with a "Partner with Us" link that routes to the new `/partner/apply` page.
