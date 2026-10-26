@@ -1,19 +1,11 @@
-import type { Metadata } from "next"
-import { AuthPageFrame } from "@/components/auth/auth-page-frame"
-import { PartnerSignUpForm } from "@/components/auth/partner-auth-forms"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = { title: "List your venue" }
-
-export default function JoinPage() {
-  return (
-    <AuthPageFrame
-      eyebrow="For venue partners"
-      title="Turn your courts into bookings."
-      description="Create a partner account to publish your venue, manage courts and schedules, and stay on top of every booking."
-      footer="Already a partner? Sign in to open your portal."
-      backLink={{ href: "/partner/sign-in", label: "Sign in" }}
-    >
-      <PartnerSignUpForm />
-    </AuthPageFrame>
-  )
+/**
+ * Legacy self-service partner signup. Venue owners are no longer created
+ * directly in `auth.users`; they must submit a `venue_applications` row and be
+ * approved by an admin first. Keep this route as a permanent bridge for old
+ * links, and send everyone to the application form.
+ */
+export default function PartnerJoinPage() {
+  redirect("/partner/apply")
 }

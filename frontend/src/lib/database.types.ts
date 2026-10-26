@@ -14,8 +14,8 @@ export type MediaStatus = Enums<"media_status">
 export type ApplicationStatus = Enums<"application_status">
 export type NotificationType = Enums<"notification_type">
 
-/** Roles a public signup form is allowed to request. Admin roles are never self-service. */
-export type PublicSignupRole = Extract<UserRole, "customer" | "venue_owner">
+/** Roles a public signup form is allowed to request. Admin and venue_owner roles are never self-service. */
+export type PublicSignupRole = Extract<UserRole, "customer">
 
 /**
  * `profiles.subscription_tier` is `TEXT` guarded by the

@@ -17,6 +17,9 @@
 All frontend-actionable tasks below are **complete**. The only open items are backend
 dependencies, listed under "Blocked (not frontend-actionable)".
 
+Task 7 (partner onboarding) is implemented; its *optional* fields (sport/category,
+description) are the one sub-item waiting on backend columns, see Blocked §3.
+
 ---
 
 ## 1. Customer UI: The Venue Storefront (Movie Theater Pattern) — DONE
@@ -94,6 +97,29 @@ dependencies, listed under "Blocked (not frontend-actionable)".
 > today, court falls back to the first court with a free slot, saved storefront showtime is
 > re-selected).
 
+## 7. Venue Partner Onboarding (Application Flow) — DONE
+**Goal:** Replace the legacy "Owner Signup" flow. Venue owners must no longer be directly created in `auth.users`. They must fill out an application form that inserts into the `venue_applications` table, which the Admin will later review.
+
+- [x] **Route Refactor:** Deprecate the old `/partner/signup` page. Create a new public marketing page/form route (e.g., `/partner/apply` or `/list-your-venue`).
+- [x] **Application Form UI:** Build a clean, professional application form collecting only the required official data.
+  - *Fields Required:* Applicant Name, Email Address, Phone Number, Venue Name, Venue Physical Address.
+  - [ ] *Optional Fields:* Primary Sport/Category (Futsal, E-Sports, Mixed), Brief Description. **Blocked on backend columns — see Blocked §3.**
+- [x] **Database Wiring:** Wire the form submission to insert directly into `public.venue_applications`.
+  - **CRITICAL:** Do NOT call `supabase.auth.signUp()`. The form simply pushes a row to the database with `status: 'pending'`.
+- [x] **Success UX:** Upon successful insertion, replace the form with a success state (e.g., "Application Received! Our team will review your venue details. Look out for an invitation email once approved.").
+- [x] **Auth Redirects:** Ensure the main "Login" screen removes any "Sign up as Venue Owner" buttons, replacing them with a "Partner with Us" link that routes to the new `/partner/apply` page.
+
+> Implemented in `frontend/src/app/(partner)/partner/apply/page.tsx` +
+> `frontend/src/components/partner/venue-application-form.tsx` (required fields,
+> PK phone normalization, inline validation, success state), wired through
+> `frontend/src/lib/queries/applications.ts` → `frontend/src/hooks/use-applications.ts`.
+> The legacy `/partner/join` self-service signup now `redirect()`s to
+> `/partner/apply`, `signUpVenueOwner` was removed from `frontend/src/lib/auth.ts`,
+> and every "list your venue"/partner CTA now points at `/partner/apply`
+> (`site-footer`, customer sign-in/sign-up, partner sign-in).
+> Admin review/approve lives at `/admin/applications` via the `approve-venue`
+> Edge Function.
+
 ---
 
 ## Blocked (not frontend-actionable)
@@ -113,14 +139,15 @@ dependencies, listed under "Blocked (not frontend-actionable)".
 > must be enabled for `public.notifications` (if not already) for the bell to update on
 > new inserts. The frontend subscription is already in place
 > (`notification-provider.tsx`).
-## 7. Venue Partner Onboarding (Application Flow)
-**Goal:** Replace the legacy "Owner Signup" flow. Venue owners must no longer be directly created in `auth.users`. They must fill out an application form that inserts into the `venue_applications` table, which the Admin will later review.
 
-- [ ] **Route Refactor:** Deprecate the old `/partner/signup` page. Create a new public marketing page/form route (e.g., `/partner/apply` or `/list-your-venue`).
-- [ ] **Application Form UI:** Build a clean, professional application form collecting only the required official data. 
-  - *Fields Required:* Applicant Name, Email Address, Phone Number, Venue Name, Venue Physical Address.
-  - *Optional Fields:* Primary Sport/Category (Futsal, E-Sports, Mixed), Brief Description.
-- [ ] **Database Wiring:** Wire the form submission to insert directly into `public.venue_applications`. 
-  - **CRITICAL:** Do NOT call `supabase.auth.signUp()`. The form simply pushes a row to the database with `status: 'pending'`.
-- [ ] **Success UX:** Upon successful insertion, replace the form with a success state (e.g., "Application Received! Our team will review your venue details. Look out for an invitation email once approved.").
-- [ ] **Auth Redirects:** Ensure the main "Login" screen removes any "Sign up as Venue Owner" buttons, replacing them with a "Partner with Us" link that routes to the new `/partner/apply` page.
+### 3. Optional partner-application fields — BLOCKED (backend schema)
+- [ ] *Optional Fields:* Primary Sport/Category and Brief Description on the
+  `/partner/apply` form.
+
+> **Blocker:** `public.venue_applications` (migration
+> `20261015114427_create_venue_applications.sql`) only defines the five required
+> columns. The frontend will not write applicant text into admin-owned
+> `admin_notes`, so these fields stay off the form until the backend adds
+> `primary_category` / `description` (or `metadata jsonb`) and regenerates
+> `frontend/src/types/database.types.ts`. See `doc/Design_Backend.md` §7 item 6.
+

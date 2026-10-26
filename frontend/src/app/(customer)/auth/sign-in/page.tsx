@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { AuthPageFrame } from "@/components/auth/auth-page-frame"
 import { CustomerSignInForm } from "@/components/auth/auth-forms"
 
@@ -26,7 +27,15 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       eyebrow="Welcome back"
       title="Step back onto the court."
       description="Sign in to book a venue, manage your bookings, or pick up where you left off."
-      footer="New here? Create a customer account in seconds."
+      footer={
+        <>
+          New here? Create a customer account in seconds. Own a venue?{" "}
+          <Link href="/partner/apply" className="font-semibold text-primary hover:underline">
+            Partner with us
+          </Link>
+          .
+        </>
+      }
       backLink={{ href: "/", label: "Back to discover" }}
     >
       <CustomerSignInForm nextPath={next ? getSafeNextPath(next) : null} />

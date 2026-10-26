@@ -156,7 +156,7 @@ export function SignUpForm() {
       </p>
       <p className="text-center text-sm text-muted-foreground">
         Own a venue?{" "}
-        <Link href="/partner/join" className="font-semibold text-primary hover:underline">List it on the partner portal</Link>
+        <Link href="/partner/apply" className="font-semibold text-primary hover:underline">Partner with us</Link>
       </p>
     </form>
   )
