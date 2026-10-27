@@ -160,3 +160,14 @@ description) are the one sub-item waiting on backend columns, see Blocked §3.
 > `20261015121301_admin_ram_and_notifications.sql`). Realtime must be enabled for
 > `public.notifications` (if not already) for the bell to update on new inserts. The
 > frontend subscription is already in place (`notification-provider.tsx`).
+
+### Synchronization Audit - 2026-10-27
+- [ ] **Wire Storefront Dynamic Time Chips to Dynamic Availability RPC (`get_available_time_chips`):**
+  - Switch the category showtime chips in `frontend/src/components/booking/venue-detail-page.tsx` from querying static `slots` via `useAvailableSlotsForCourts` to invoking `supabase.rpc('get_available_time_chips', { p_venue_id, p_category, p_target_date })`.
+  - Enables dynamic composite inventory calculation (supporting parent-child hierarchy like VIP room vs child PCs) and honors venue `operating_hours`.
+- [ ] **Display Hold History & Quota in Customer Profile / Booking Drawer:**
+  - `public.hold_logs` table has a user `SELECT` policy (`users_select_own_hold_logs`), but the customer UI does not yet query or surface remaining weekly hold quota or hold history.
+  - Expose recent holds or remaining free-tier holds in `/profile` or in the hold limit bottom sheet (`freemium-limit-sheet.tsx`).
+- [ ] **Admin Application Notes Management UI:**
+  - The `venue_applications.admin_notes` column is present in the schema and update mutations (`useUpdateVenueApplicationStatusMutation`), but `frontend/src/components/admin/applications-page.tsx` does not display an input modal/dialog to view or edit notes during review or rejection.
+  - Add notes input modal before status update in `/admin/applications`.

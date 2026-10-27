@@ -14,3 +14,12 @@
 - [x] **Partner Staff Invitation Edge Function (`invite-team-member`):**
   - Create an Edge Function allowing authenticated venue owners to invite staff (`role = 'venue_staff'`) to their venue via `auth.admin.inviteUserByEmail`.
   - Inserts the `venue_team` record with specified `permissions` (`view_bookings`, `edit_pricing`, etc.).
+
+
+### Synchronization Audit - 2026-10-27
+- [x] **Schema Migration: Add Optional Category & Description Columns to `venue_applications`:**
+  - Add `primary_category TEXT` and `description TEXT` (or a `metadata JSONB` column) to `public.venue_applications`.
+  - Unblocks optional fields on the partner application form (`/partner/apply`) and regenerate `frontend/src/types/database.types.ts`.
+- [x] **Implement Dynamic Slot Booking / Hold RPC for Composite Inventory (`hold_resource_time`):**
+  - While `get_available_time_chips` provides dynamic inventory calculation for composite resources, `hold_slot` still strictly requires a static `p_court_id` and pre-generated static `slots` rows.
+  - Implement a dynamic resource booking / hold RPC that books/holds a resource or category by `(venue_id, resource_id, start_time, end_time)` without requiring pre-seeded static slot UUIDs.
