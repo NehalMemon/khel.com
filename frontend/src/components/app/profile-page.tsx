@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
-import { Camera, Check, LoaderCircle, UserRound } from "lucide-react"
+import { Camera, Check, Clock, LoaderCircle, UserRound } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,9 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Notice } from "@/components/app/notice"
 import { useAuth } from "@/components/auth/auth-provider"
-import { useUpdateProfileMutation } from "@/hooks/use-customer-data"
+import { useHoldLogs, useHoldLogsCountThisWeek, useUpdateProfileMutation } from "@/hooks/use-customer-data"
 import type { ProfileRow } from "@/lib/database.types"
-import { getAuthErrorMessage, normalizePhone } from "@/lib/utils"
+import { formatDate, formatTime, getAuthErrorMessage, normalizePhone } from "@/lib/utils"
 
 function getFormState(profile: ProfileRow) {
   return {
@@ -61,12 +61,42 @@ function ProfileForm({ profile }: { profile: ProfileRow }) {
 
 export function ProfilePage() {
   const { profile } = useAuth()
+  const holdLogsQuery = useHoldLogs(profile?.id ?? null, 5)
+  const holdCountQuery = useHoldLogsCountThisWeek(profile?.id ?? null)
   if (!profile) return <main className="mx-auto max-w-3xl px-4 py-10"><Notice tone="error" title="Profile unavailable">Your account profile could not be loaded.</Notice></main>
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Your account</p><h1 className="mt-2 text-4xl font-black tracking-[-0.06em]">Profile</h1><p className="mt-2 text-muted-foreground">Keep your contact details current for smooth bookings and venue updates.</p>
       {!profile.phone || profile.phone.startsWith("pending-") ? <Notice tone="warning" title="Your phone number is incomplete" className="mt-6">Add a real mobile number before you book a court or list a venue.</Notice> : null}
       <ProfileForm key={`${profile.id}:${profile.updated_at}`} profile={profile} />
+      <Card className="mt-6">
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Clock className="size-4 text-primary" />Holds &amp; quota</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Free accounts can hold one court slot every seven days.</p>
+            </div>
+            <span className="text-sm text-muted-foreground">{holdCountQuery.data ?? 0}/1 this week</span>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-5">
+          {holdLogsQuery.isPending ? <p className="text-sm text-muted-foreground">Loading hold history...</p> : null}
+          {!holdLogsQuery.isPending && (holdLogsQuery.data?.length ?? 0) === 0 ? <p className="text-sm text-muted-foreground">No recent holds.</p> : null}
+          {(holdLogsQuery.data?.length ?? 0) > 0 ? (
+            <div className="grid gap-2">
+              {holdLogsQuery.data!.map((log) => (
+                <div key={log.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+                  <div>
+                    <p className="font-medium">Held slot</p>
+                    <p className="text-muted-foreground">{log.created_at ? formatDate(log.created_at.split('T')[0]) : ""} {log.start_time ? `• ${formatTime(log.start_time)}` : ""}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{log.created_at ? new Date(log.created_at).toLocaleString() : ""}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
     </main>
   )
 }

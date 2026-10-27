@@ -119,12 +119,19 @@ description) are the one sub-item waiting on backend columns, see Blocked §3.
 > (`site-footer`, customer sign-in/sign-up, partner sign-in).
 > Admin review/approve lives at `/admin/applications` via the `approve-venue`
 > Edge Function.
-## 1. Location-Based Search (PostGIS)
+## 1. Location-Based Search (PostGIS) — DONE
 **Priority:** HIGH — Core discovery feature for customers.
 **Goal:** Allow customers to discover nearby Futsal and GameZone venues based on their current geographic location.
-- [ ] **Geolocation Prompt:** On the `/venues` or home page, request browser location permissions (`navigator.geolocation.getCurrentPosition`).
-- [ ] **RPC Query:** If location is granted, query the existing spatial function: `supabase.rpc('search_venues_nearby', { p_lat: latitude, p_lon: longitude, p_radius_km: 15 })`.
-- [ ] **Fallback:** If location access is denied, default to fetching venues via standard `SELECT` sorted by `created_at` or `avg_rating`.
+- [x] **Geolocation Prompt:** On the `/venues` or home page, request browser location permissions (`navigator.geolocation.getCurrentPosition`).
+- [x] **RPC Query:** If location is granted, query the existing spatial function: `supabase.rpc('search_venues_nearby', { p_lat: latitude, p_lon: longitude, p_radius_km: 15 })`.
+- [x] **Fallback:** If location access is denied, default to fetching venues via standard `SELECT` sorted by `created_at` or `avg_rating`.
+
+> Implemented in `frontend/src/hooks/use-user-origin.ts` (requests geolocation with
+> fallback to central Karachi when denied/unavailable), `frontend/src/lib/queries/customer.ts`
+> (`fetchNearbyVenues` via `supabase.rpc('search_venues_nearby', ...)` with resources
+> hydrated separately), `frontend/src/hooks/use-customer-data.ts` (`useNearbyVenues`),
+> and surfaced on the home/discover page in `frontend/src/components/app/discover-page.tsx`
+> (Nearby/All toggle, radius from `app_config`, "Use my location" action).
 
 ---
 
@@ -162,12 +169,20 @@ description) are the one sub-item waiting on backend columns, see Blocked §3.
 > frontend subscription is already in place (`notification-provider.tsx`).
 
 ### Synchronization Audit - 2026-10-27
-- [ ] **Wire Storefront Dynamic Time Chips to Dynamic Availability RPC (`get_available_time_chips`):**
+- [x] **Wire Storefront Dynamic Time Chips to Dynamic Availability RPC (`get_available_time_chips`):**
   - Switch the category showtime chips in `frontend/src/components/booking/venue-detail-page.tsx` from querying static `slots` via `useAvailableSlotsForCourts` to invoking `supabase.rpc('get_available_time_chips', { p_venue_id, p_category, p_target_date })`.
   - Enables dynamic composite inventory calculation (supporting parent-child hierarchy like VIP room vs child PCs) and honors venue `operating_hours`.
-- [ ] **Display Hold History & Quota in Customer Profile / Booking Drawer:**
+
+> Implemented via `frontend/src/lib/queries/customer.ts` (`fetchAvailableTimeChips`), `frontend/src/hooks/use-customer-data.ts` (`useAvailableTimeChips`), and `frontend/src/components/booking/venue-detail-page.tsx` (per-category chip queries using the RPC).
+
+- [x] **Display Hold History & Quota in Customer Profile / Booking Drawer:**
   - `public.hold_logs` table has a user `SELECT` policy (`users_select_own_hold_logs`), but the customer UI does not yet query or surface remaining weekly hold quota or hold history.
   - Expose recent holds or remaining free-tier holds in `/profile` or in the hold limit bottom sheet (`freemium-limit-sheet.tsx`).
-- [ ] **Admin Application Notes Management UI:**
+
+> Implemented via `frontend/src/lib/queries/customer.ts` (`fetchHoldLogs`, `fetchHoldLogsCountThisWeek`), `frontend/src/hooks/use-customer-data.ts` (`useHoldLogs`, `useHoldLogsCountThisWeek`), `frontend/src/components/app/profile-page.tsx` (hold history + weekly count), and `frontend/src/components/booking/freemium-limit-sheet.tsx` (remaining quota + recent holds).
+
+- [x] **Admin Application Notes Management UI:**
   - The `venue_applications.admin_notes` column is present in the schema and update mutations (`useUpdateVenueApplicationStatusMutation`), but `frontend/src/components/admin/applications-page.tsx` does not display an input modal/dialog to view or edit notes during review or rejection.
   - Add notes input modal before status update in `/admin/applications`.
+
+> Implemented in `frontend/src/components/admin/applications-page.tsx` with a notes dialog for approve/reject, persisting notes via `updateVenueApplicationStatusMutation` and displaying notes for processed applications.
