@@ -352,6 +352,71 @@ export type BookingFilters = {
   paymentStatus?: PaymentStatus
 }
 
+export type AvailableTimeChip = {
+  time: string
+  available_inventory: number
+}
+
+export async function fetchAvailableTimeChips(input: {
+  venueId: string
+  category: string
+  targetDate: string
+}): Promise<AvailableTimeChip[]> {
+  if (!isSupabaseConfigured()) return []
+  const { data, error } = await getSupabaseBrowserClient().rpc("get_available_time_chips", {
+    p_venue_id: input.venueId,
+    p_category: input.category,
+    p_target_date: input.targetDate,
+  })
+  handleError(error)
+  if (!data) return []
+  if (Array.isArray(data)) {
+    return data as AvailableTimeChip[]
+  }
+  if (typeof data === "object") {
+    // Could be returned as JSON object in some cases
+    return data as unknown as AvailableTimeChip[]
+  }
+  return []
+}
+
+export type HoldLogRow = {
+  id: string
+  user_id: string
+  resource_id: string | null
+  slot_id: string | null
+  start_time: string | null
+  end_time: string | null
+  created_at: string
+}
+
+export async function fetchHoldLogs(userId: string, limit = 10): Promise<HoldLogRow[]> {
+  if (!isSupabaseConfigured()) return []
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("hold_logs")
+    .select("id, user_id, resource_id, slot_id, start_time, end_time, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+  handleError(error)
+  return (data ?? []) as HoldLogRow[]
+}
+
+export async function fetchHoldLogsCountThisWeek(userId: string): Promise<number> {
+  if (!isSupabaseConfigured()) return 0
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay())
+  startOfWeek.setHours(0, 0, 0, 0)
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("hold_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", startOfWeek.toISOString())
+  if (error) return 0
+  return data?.length ?? 0
+}
+
 export type QueryError = { message: string }
 
 export function formatQueryError(error: unknown): string {

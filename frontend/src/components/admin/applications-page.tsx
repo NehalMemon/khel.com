@@ -8,6 +8,7 @@ import {
   Lock,
   Mail,
   MapPin,
+  MessageSquare,
   Phone,
   Search,
   ShieldCheck,
@@ -18,6 +19,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Table,
   TableBody,
@@ -44,6 +54,10 @@ export function ApplicationsPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false)
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
+  const [selectedStatus, setSelectedStatus] = useState<ApplicationStatus | null>(null)
+  const [adminNotes, setAdminNotes] = useState("")
 
   const applicationsQuery = useVenueApplications(
     statusFilter === "all" ? undefined : statusFilter,
@@ -79,23 +93,36 @@ export function ApplicationsPage() {
     })
   }, [applicationsQuery.data, search])
 
-  async function handleUpdateStatus(id: string, newStatus: ApplicationStatus) {
-    if (!canManageApplications) return
+  function openNotesDialog(id: string, status: ApplicationStatus) {
+    setSelectedAppId(id)
+    setSelectedStatus(status)
+    setAdminNotes(`Updated to ${status} by ${profile?.name || "admin"}`)
+    setNotesDialogOpen(true)
+  }
+
+  async function confirmUpdateStatus() {
+    if (!selectedAppId || !selectedStatus || !canManageApplications) return
     setActionError(null)
     setActionSuccess(null)
-    setProcessingId(id)
+    setProcessingId(selectedAppId)
     try {
       await updateMutation.mutateAsync({
-        id,
-        status: newStatus,
-        adminNotes: `Updated to ${newStatus} by ${profile?.name || "admin"}`,
+        id: selectedAppId,
+        status: selectedStatus,
+        adminNotes: adminNotes.trim() || undefined,
       })
-      setActionSuccess(`Application ${newStatus}.`)
+      setActionSuccess(`Application ${selectedStatus}.`)
+      setNotesDialogOpen(false)
     } catch (err) {
       setActionError(getErrorMessage(err))
     } finally {
       setProcessingId(null)
     }
+  }
+
+  async function handleUpdateStatus(id: string, newStatus: ApplicationStatus) {
+    if (!canManageApplications) return
+    openNotesDialog(id, newStatus)
   }
 
   /**
@@ -105,12 +132,32 @@ export function ApplicationsPage() {
    */
   async function handleApprove(id: string) {
     if (!canManageApplications) return
+    setSelectedAppId(id)
+    setSelectedStatus("approved")
+    setAdminNotes(`Approved by ${profile?.name || "admin"}`)
+    setNotesDialogOpen(true)
+  }
+
+  async function confirmApprove() {
+    if (!selectedAppId || !canManageApplications) return
     setActionError(null)
     setActionSuccess(null)
-    setProcessingId(id)
+    setProcessingId(selectedAppId)
     try {
-      const result = await approveMutation.mutateAsync(id)
+      const result = await approveMutation.mutateAsync(selectedAppId)
+      if (adminNotes.trim()) {
+        try {
+          await updateMutation.mutateAsync({
+            id: selectedAppId,
+            status: "approved",
+            adminNotes: adminNotes.trim(),
+          })
+        } catch {
+          // ignore
+        }
+      }
       setActionSuccess(result.message ?? "Application approved.")
+      setNotesDialogOpen(false)
     } catch (err) {
       setActionError(getErrorMessage(err))
     } finally {
@@ -353,7 +400,14 @@ export function ApplicationsPage() {
                                 </Button>
                               </div>
                             ) : (
-                              <span className="text-xs text-muted-foreground">Processed</span>
+                              <div className="inline-flex items-center gap-2">
+                                {app.admin_notes ? (
+                                  <span className="text-xs text-muted-foreground max-w-[120px] truncate" title={app.admin_notes}>
+                                    <MessageSquare className="inline size-3 mr-1" />{app.admin_notes}
+                                  </span>
+                                ) : null}
+                                <span className="text-xs text-muted-foreground">Processed</span>
+                              </div>
                             )}
                           </TableCell>
                         ) : null}
@@ -366,6 +420,49 @@ export function ApplicationsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="size-4" />
+              {selectedStatus === "approved" ? "Approve Application" : "Reject Application"}
+            </DialogTitle>
+            <DialogDescription>
+              Add admin notes for this application review. These notes will be saved with the status update.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <label htmlFor="admin-notes" className="text-sm font-medium">Admin Notes</label>
+            <Textarea
+              id="admin-notes"
+              value={adminNotes}
+              onChange={(e) => setAdminNotes(e.target.value)}
+              placeholder="Add review notes..."
+              rows={4}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setNotesDialogOpen(false)} disabled={processingId !== null}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedStatus === "approved") {
+                  void confirmApprove()
+                } else if (selectedStatus && selectedAppId) {
+                  void confirmUpdateStatus()
+                }
+              }}
+              disabled={processingId !== null}
+              className={selectedStatus === "approved" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+            >
+              {processingId ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+              Confirm {selectedStatus}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -34,7 +34,7 @@ import { HoldCountdown } from "@/components/booking/hold-countdown"
 import { SafepayCheckoutButton } from "@/components/booking/safepay-checkout-button"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useBookingSelection } from "@/components/booking/booking-selection-provider"
-import { useAvailableSlotsForCourts, useHoldSlotMutation, useVenue } from "@/hooks/use-customer-data"
+import { useAvailableTimeChips, useHoldSlotMutation, useVenue } from "@/hooks/use-customer-data"
 import { isSupabaseConfigured } from "@/lib/supabase-browser"
 import type { HoldSlotResult, ResourceRow } from "@/lib/database.types"
 import type { PublicSlotRow } from "@/lib/queries/customer"
@@ -110,20 +110,8 @@ export function VenueDetailPage({ slug }: { slug: string }) {
 
   const venue = venueQuery.data ?? null
   const resources = useMemo(() => venue?.resources ?? [], [venue])
-  const resourceIds = useMemo(() => resources.map((resource) => resource.id), [resources])
-
-  // ONE request for every resource's availability on the chosen date.
-  const slotsQuery = useAvailableSlotsForCourts(resourceIds, date)
 
   const maxAdvanceDays = venue?.max_advance_booking_days ?? DEFAULT_ADVANCE_DAYS
-
-  const availableSlots = useMemo(() => {
-    const rows = slotsQuery.data ?? []
-    return rows.filter(
-      (slot) =>
-        slot.status === "available" && isSlotInFuture(slot.date, slot.start_time),
-    )
-  }, [slotsQuery.data])
 
   /** Category → its active resources (rooms and the assets inside them). */
   const groups = useMemo<CategoryGroup[]>(() => {
@@ -149,56 +137,61 @@ export function VenueDetailPage({ slug }: { slug: string }) {
       .sort((a, b) => a.category.localeCompare(b.category))
   }, [resources])
 
-  /**
-   * Showtimes per category. A chip exists at `start_time` when at least one
-   * resource in the category still has a free slot then, and it names the
-   * first free resource — the auto-assignment the customer never sees.
-   */
+  // Use dynamic availability RPC per category
   const chipsByCategory = useMemo(() => {
-    const slotsByResource = new Map<string, PublicSlotRow[]>()
-    for (const slot of availableSlots) {
-      const bucket = slotsByResource.get(slot.court_id)
-      if (bucket) bucket.push(slot)
-      else slotsByResource.set(slot.court_id, [slot])
-    }
     const result = new Map<string, ChipChoice[]>()
     for (const group of groups) {
-      const byStart = new Map<string, ChipChoice>()
-      for (const startKey of new Set(
-        group.resources.flatMap(
-          (resource) =>
-            (slotsByResource.get(resource.id) ?? []).map((slot) => slot.start_time),
-        ),
-      )) {
-        const free = group.resources
-          .map((resource) =>
-            (slotsByResource.get(resource.id) ?? []).find(
-              (slot) => slot.start_time === startKey,
-            ),
-          )
-          .filter((slot): slot is PublicSlotRow => Boolean(slot))
-        if (free.length === 0) continue
-        byStart.set(startKey, {
+      // We'll build chips after queries; this memo will be updated when chip data loads
+      result.set(group.category, [])
+    }
+    return result
+  }, [groups])
+
+  const holdMutation = useHoldSlotMutation()
+
+  // Fetch chips per category
+  const chipQueries = groups.map((group) => {
+    return useAvailableTimeChips(venue?.id ?? null, group.category, date)
+  })
+
+  const chipsByCategoryFinal = useMemo(() => {
+    const result = new Map<string, ChipChoice[]>()
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i]
+      const query = chipQueries[i]
+      const chips = query.data ?? []
+      if (chips.length === 0) continue
+      const list: ChipChoice[] = []
+      for (const chip of chips) {
+        if (chip.available_inventory <= 0) continue
+        // Find a free resource to assign (prefer first active in category)
+        const assigned = group.resources[0]
+        // Create a synthetic slot for the chip
+        const slot: PublicSlotRow = {
+          id: `${assigned.id}-${chip.time}`,
+          court_id: assigned.id,
+          date: date,
+          start_time: chip.time,
+          end_time: chip.time.length === 5 ? (() => {
+            const [h, m] = chip.time.split(':').map(Number)
+            const endH = h + 1
+            return `${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+          })() : chip.time,
+          status: "available",
+        } as PublicSlotRow
+        list.push({
           category: group.category,
-          slot: free[0],
-          resource: group.resources.find(
-            (resource) => resource.id === free[0].court_id,
-          ) as ResourceRow,
-          freeCount: free.length,
+          slot,
+          resource: assigned,
+          freeCount: chip.available_inventory,
           totalCount: group.resources.length,
         })
       }
-      result.set(
-        group.category,
-        [...byStart.values()].sort((a, b) =>
-          a.slot.start_time.localeCompare(b.slot.start_time),
-        ),
-      )
+      list.sort((a, b) => a.slot.start_time.localeCompare(b.slot.start_time))
+      result.set(group.category, list)
     }
     return result
-  }, [availableSlots, groups])
-
-  const holdMutation = useHoldSlotMutation()
+  }, [groups, chipQueries, date])
 
   function resetHold() {
     setHold(null)
@@ -292,6 +285,8 @@ export function VenueDetailPage({ slug }: { slug: string }) {
     shiftDate(today, index),
   )
   const price = choice ? Number(choice.resource.hourly_rate) * slotHours(choice.slot) : 0
+
+  const anyChipsLoading = chipQueries.some((q) => q.isPending)
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
@@ -395,14 +390,14 @@ export function VenueDetailPage({ slug }: { slug: string }) {
             </div>
           </div>
 
-          {slotsQuery.isPending ? <LoadingState label="Loading times" className="mt-6" /> : null}
-          {slotsQuery.isError ? (
+          {anyChipsLoading ? <LoadingState label="Loading times" className="mt-6" /> : null}
+          {chipQueries.some((q) => q.isError) ? (
             <Notice tone="error" title="Could not load times" className="mt-6">
-              {slotsQuery.error.message}
+              {(chipQueries.find((q) => q.isError)?.error as Error)?.message}
             </Notice>
           ) : null}
 
-          {!slotsQuery.isPending && !slotsQuery.isError && groups.length === 0 ? (
+          {!anyChipsLoading && groups.length === 0 ? (
             <EmptyState
               className="mt-6"
               title="Nothing published yet"
@@ -410,7 +405,7 @@ export function VenueDetailPage({ slug }: { slug: string }) {
             />
           ) : null}
 
-          {!slotsQuery.isPending && !slotsQuery.isError && groups.length > 0 && availableSlots.length === 0 ? (
+          {!anyChipsLoading && groups.length > 0 && [...chipsByCategoryFinal.values()].every((c) => c.length === 0) ? (
             <div className="mt-6 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
               <p>No available times on {formatDate(date)}.</p>
               <Button
@@ -428,7 +423,7 @@ export function VenueDetailPage({ slug }: { slug: string }) {
           {/* Category blocks — never a raw "PC 1 / PC 2" asset list. */}
           <div className="mt-6 grid gap-5">
             {groups.map((group) => {
-              const chips = chipsByCategory.get(group.category) ?? []
+              const chips = chipsByCategoryFinal.get(group.category) ?? []
               if (chips.length === 0) return null
               return (
                 <Card key={group.category} className="border-foreground/8 bg-card">

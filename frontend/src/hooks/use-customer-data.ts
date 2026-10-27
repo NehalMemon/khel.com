@@ -4,8 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { ProfileUpdate } from "@/lib/database.types"
 import {
   cancelCustomerBooking,
+  fetchAvailableTimeChips,
   fetchCustomerBookingByRef,
   fetchCustomerBookings,
+  fetchHoldLogs,
+  fetchHoldLogsCountThisWeek,
   fetchNearbyVenues,
   fetchPublishedVenues,
   fetchSlots,
@@ -13,6 +16,8 @@ import {
   fetchVenueBySlug,
   fetchVenueResources,
   holdSlot,
+  type AvailableTimeChip,
+  type HoldLogRow,
   type VenueFilters,
 } from "@/lib/queries/customer"
 import { updateProfile } from "@/lib/queries/profile"
@@ -88,6 +93,35 @@ export function useAvailableSlotsForCourts(courtIds: string[], date: string) {
     queryKey: ["slots", "available", "courts", sortedIds, date],
     queryFn: () => fetchSlotsForCourts(sortedIds, date, "available"),
     enabled: sortedIds.length > 0 && Boolean(date),
+  })
+}
+
+export function useAvailableTimeChips(venueId: string | null, category: string | null, date: string) {
+  return useQuery({
+    queryKey: ["time-chips", venueId, category, date],
+    queryFn: () =>
+      fetchAvailableTimeChips({
+        venueId: venueId as string,
+        category: category as string,
+        targetDate: date,
+      }),
+    enabled: Boolean(venueId && category && date),
+  })
+}
+
+export function useHoldLogs(userId: string | null, limit = 10) {
+  return useQuery({
+    queryKey: ["hold-logs", userId, limit],
+    queryFn: () => fetchHoldLogs(userId as string, limit),
+    enabled: Boolean(userId),
+  })
+}
+
+export function useHoldLogsCountThisWeek(userId: string | null) {
+  return useQuery({
+    queryKey: ["hold-logs", "count", "week", userId],
+    queryFn: () => fetchHoldLogsCountThisWeek(userId as string),
+    enabled: Boolean(userId),
   })
 }
 

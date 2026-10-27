@@ -1,6 +1,6 @@
 "use client"
 
-import { Crown } from "lucide-react"
+import { Crown, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -11,6 +11,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useCommissionRate } from "@/lib/app-config"
+import { useAuth } from "@/components/auth/auth-provider"
+import { useHoldLogs, useHoldLogsCountThisWeek } from "@/hooks/use-customer-data"
+import { formatDate, formatTime } from "@/lib/utils"
 
 /**
  * Free accounts may hold a single slot per week; the `hold_slot` RPC raises
@@ -26,6 +29,9 @@ export function FreemiumLimitSheet({
   onOpenChange: (open: boolean) => void
 }) {
   const commissionRate = useCommissionRate()
+  const { profile } = useAuth()
+  const holdLogsQuery = useHoldLogs(profile?.id ?? null, 3)
+  const holdCountQuery = useHoldLogsCountThisWeek(profile?.id ?? null)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -43,6 +49,25 @@ export function FreemiumLimitSheet({
         </SheetHeader>
 
         <div className="grid gap-4 px-4">
+          <div className="rounded-xl border p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold flex items-center gap-2"><Clock className="size-4" />Remaining free-tier holds</p>
+              <span className="text-sm text-muted-foreground">{Math.max(0, 1 - (holdCountQuery.data ?? 0))}/1 left this week</span>
+            </div>
+            {(holdLogsQuery.data?.length ?? 0) > 0 ? (
+              <div className="mt-3 grid gap-2">
+                <p className="text-xs font-medium text-muted-foreground">Recent holds</p>
+                {holdLogsQuery.data!.map((log) => (
+                  <div key={log.id} className="flex items-center justify-between text-xs">
+                    <span>{log.created_at ? formatDate(log.created_at.split('T')[0]) : ""}{log.start_time ? ` • ${formatTime(log.start_time)}` : ""}</span>
+                    <span className="text-muted-foreground">{log.created_at ? new Date(log.created_at).toLocaleTimeString() : ""}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">No holds this week yet.</p>
+            )}
+          </div>
           <div className="rounded-xl border border-dashed p-4">
             <p className="text-sm font-semibold">What a premium account changes</p>
             <ul className="mt-2 grid gap-1.5 text-sm text-muted-foreground">
