@@ -101,9 +101,9 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- --------------------------------------------------------
--- 3. Courts
+-- 3. Resources (formerly Courts)
 -- --------------------------------------------------------
-INSERT INTO public.courts (id, venue_id, name, sport_type, hourly_rate, metadata, created_at, updated_at)
+INSERT INTO public.resources (id, venue_id, name, category, hourly_rate, metadata, created_at, updated_at)
 VALUES
   -- Bahadurabad Futsal Arena
   ('c1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'Pitch A (5v5)', 'Futsal', 3000.00, '{"surface": "artificial_turf", "dimension": "30x20m"}', now(), now()),
@@ -163,7 +163,7 @@ INSERT INTO public.bookings (
   booking_ref, 
   customer_id, 
   venue_id, 
-  court_id, 
+  resource_id, 
   status, 
   payment_status, 
   total_charged, 
