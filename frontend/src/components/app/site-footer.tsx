@@ -11,7 +11,7 @@ export function SiteFooter() {
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">
           <Link href="/auth/sign-up" className="hover:text-foreground">Create account</Link>
-          <Link href="/partner/join" className="hover:text-foreground">List your venue</Link>
+          <Link href="/partner/apply" className="hover:text-foreground">Partner with us</Link>
           <Link href="/profile" className="hover:text-foreground">Your profile</Link>
         </div>
       </div>

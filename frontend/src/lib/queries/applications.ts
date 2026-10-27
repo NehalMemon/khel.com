@@ -19,20 +19,21 @@ function handleError(error: { message: string } | null): void {
  * `WITH CHECK (true)` (migration 20261015114427), so an anonymous visitor can
  * submit without an account. `status` is left at the backend default (`pending`)
  * and is never chosen by the client.
+ *
+ * Do not add `.select()` here: the table's only SELECT policy is admin-only, so
+ * an anonymous `INSERT ... RETURNING` is rejected/returns no row even though the
+ * insert itself succeeds. The form does not need the created row back.
  */
 export async function submitVenueApplication(
   values: VenueApplicationValues,
-): Promise<VenueApplicationRow> {
+): Promise<void> {
   if (!isSupabaseConfigured()) {
     throw new Error("Connect Supabase before submitting an application.")
   }
-  const { data, error } = await getSupabaseBrowserClient()
+  const { error } = await getSupabaseBrowserClient()
     .from("venue_applications")
     .insert(values)
-    .select(applicationFields)
-    .single()
   handleError(error)
-  return data as VenueApplicationRow
 }
 
 /**

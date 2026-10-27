@@ -91,7 +91,7 @@ Already shipped (per the Backend→Frontend Handoff doc, `staging` branch): migr
    "metadata": { "booking_id": "..." } }` body. Worth documenting the chosen approach
    alongside the webhook contract.
 
-## 7. Venue Onboarding + Team — Advisory Notes From Frontend (2026-10-15)
+## 7. Venue Onboarding + Team — Advisory Notes From Frontend (2026-10-15, updated 2026-10-26)
 
 > From the frontend-only `abid-dev` branch while building the new tasks 5 & 6
 > (`doc/assigned-frontend-tasks.md`). Nothing under `supabase/` was touched; these
@@ -133,3 +133,18 @@ Already shipped (per the Backend→Frontend Handoff doc, `staging` branch): migr
    (outside `frontend/`), in addition to the app's real copy. It is committed and
    currently unreferenced by the app. Left in place for the backend owner to decide
    — it looks like stray duplication (related to §5 item 11 about `web/src/...`).
+
+6. **Optional application fields need columns before the form can collect them.**
+   The onboarding task asks for optional *Primary Sport/Category* and *Brief
+   Description*, but `20261015114427_create_venue_applications.sql` only defines the
+   five required fields. The frontend intentionally does **not** cram user text into
+   `admin_notes` (admin-owned) or `venue_address`. Adding
+   `primary_category text` / `description text` (or a `metadata jsonb` column) plus a
+   regenerated `database.types.ts` would let the form persist them.
+
+7. **Anonymous `INSERT ... RETURNING` on `venue_applications` is blocked by RLS.**
+   The public `INSERT` policy is `WITH CHECK (true)`, but the only `SELECT` policy is
+   admin-only, so PostgREST cannot return the inserted row to an anonymous
+   applicant. The frontend therefore inserts without `.select()`; the submission
+   still succeeds. If a caller ever needs the new `id`, expose a `SECURITY DEFINER`
+   RPC instead of widening the `SELECT` policy.

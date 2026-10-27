@@ -83,7 +83,7 @@ Whenever a backend feature, migration, or API service is completed, it must be d
     - Must be validated before form submission.
     - Pakistani format recommended: `^((\+92)|(0092)|(0))?3[0-9]{9}$` (e.g., `+923001234567` or `03001234567`). Normalize to E.164 format before sending.
   - **Password:** Minimum 8 characters with strength indicator.
-  - **Role Specification:** Pass `role: 'venue_owner'` when signing up from the Partner Portal (`/partner/join`); default or pass `role: 'customer'` for marketplace users.
+  - **Role Specification:** Pass `role: 'customer'` for marketplace signups. Venue owners are no longer self-service: they submit `/partner/apply` (a `venue_applications` insert), and the admin `approve-venue` flow provisions the `venue_owner` account server-side — the browser never calls `auth.signUp()` for a venue owner.
 - **State Handling & Edge Cases:**
   - **Profile Completion Notice:** If a user signed up via an external provider or email without a phone number (i.e. their profile has `phone LIKE 'pending-%'`), prompt them with a banner/modal to complete their profile with a verified phone number before booking or listing venues.
   - **Duplicate Phone Error:** If a phone number is already registered to another user, display an explicit inline error: *"This phone number is already linked to an account."*

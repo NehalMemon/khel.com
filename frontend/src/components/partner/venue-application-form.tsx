@@ -54,9 +54,10 @@ export function VenueApplicationForm() {
           <CheckCircle2 className="size-6" />
         </div>
         <div>
-          <h2 className="text-xl font-bold">Application submitted</h2>
+          <h2 className="text-xl font-bold">Application received!</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Your application is under review. Our team will contact you shortly.
+            Our team will review your venue details. Look out for an invitation email
+            once your application is approved.
           </p>
         </div>
         <Button variant="outline" asChild>

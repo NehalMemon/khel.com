@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { AuthPageFrame } from "@/components/auth/auth-page-frame"
 import { PartnerSignInForm } from "@/components/auth/partner-auth-forms"
 
@@ -40,8 +41,16 @@ export default async function SignInPage({
       eyebrow="Welcome back"
       title="Run your venue from one place."
       description="Sign in to manage courts, schedules, photos, and every booking your venue receives."
-      footer="New partner? Create a venue owner account in a couple of minutes."
-      backLink={{ href: "/partner/join", label: "List your venue" }}
+      footer={
+        <>
+          New partner?{" "}
+          <Link href="/partner/apply" className="font-semibold text-primary hover:underline">
+            Partner with us
+          </Link>{" "}
+          to submit a venue application.
+        </>
+      }
+      backLink={{ href: "/partner", label: "Back to partner overview" }}
     >
       <PartnerSignInForm nextPath={getSafeNextPath(next)} />
     </AuthPageFrame>
